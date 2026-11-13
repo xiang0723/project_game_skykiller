@@ -319,7 +319,8 @@
   #dnBoot .skip{position:absolute;right:16px;bottom:14px;font-size:13px;opacity:.6}
   .item{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px dashed rgba(125,255,106,.18);padding:9px 0;font-size:13px}
   .item .nm{font-size:14px;color:#fff}
-  .item .lv{color:var(--accent)}
+  .item .lv{color:var(--accent);white-space:nowrap}
+  .termhead .stats > span{white-space:nowrap}   /* 手機上只在「｜」處換行，不會把「11 件」拆開 */
   .item .ds{opacity:.7}
   .item button{margin:0 !important;white-space:nowrap}
   #tab-info h3{margin:10px 0 4px;color:#ff4d6d;font-size:15px}
@@ -401,7 +402,7 @@
   <div class="box term" id="startBox">
     <div class="termhead">
       <div><span class="live"></span><span class="addr">tor://<b id="dnOnion">nmk….onion</b></span>　<b class="brand glitch" data-t="噁男殺手">噁男殺手</b> <span style="opacity:.6">ver 0.3</span></div>
-      <div class="stats">資金 <b id="sMoney">-</b>｜子彈 <b id="sAmmo">-</b>｜聲望 <b id="sRep">-</b>｜完成 <b id="sDone">-</b></div>
+      <div class="stats"><span>資金 <b id="sMoney">-</b></span>｜<span>子彈 <b id="sAmmo">-</b></span>｜<span>聲望 <b id="sRep">-</b></span>｜<span>完成 <b id="sDone">-</b></span></div>
     </div>
     <div class="tabs">
       <button class="tab on" data-tab="jobs">委託</button>
@@ -883,7 +884,23 @@ function studentPay(cl, pay){
 const payLabel = j => j.free ? '免費委託（聲望 ×3）' : j.stu ? `酬勞 ${money(j.pay)}（學生）` : `酬勞 ${money(j.pay)}`;
 const JOB_COUNT = 4;
 const REFRESH_COST = 50;   // 刷新委託的費用
-function refreshJobs(){ jobs = []; for(let i=0;i<JOB_COUNT;i++) jobs.push(makeJob()); }
+function refreshJobs(){ jobs = []; for(let i=0;i<JOB_COUNT;i++) jobs.push(makeJob()); saveJobs(); }
+/* 目前的委託存進存檔：重新整理網頁不會變成免費刷新（解密過的也會記住）。
+   衣裝存名字，讀回來時換回 HATS／SHIRTS／HAIRS 裡的同一個物件（程式用 === 比對有沒有戴帽子） */
+function saveJobs(){
+  save.jobs = jobs.map(j=>({...j, o:{hair:j.o.hair.n, hat:j.o.hat.n, shirt:j.o.shirt.n}}));
+  persist();
+}
+function loadJobs(){
+  if(!Array.isArray(save.jobs) || !save.jobs.length) return false;
+  const back = save.jobs.map(j=>{
+    const o = {hair:HAIRS.find(x=>x.n===j.o?.hair), hat:HATS.find(x=>x.n===j.o?.hat), shirt:SHIRTS.find(x=>x.n===j.o?.shirt)};
+    if(!o.hair || !o.hat || !o.shirt || !DISTRICTS[j.district] || !DIFF[j.stars] || !j.req?.steps?.every(p=>PART[p])) return null;
+    return {...j, o};
+  });
+  if(back.some(j=>!j)) return false;   // 存檔裡的委託格式不對（舊版存檔）就重抓
+  jobs = back; return true;
+}
 const SHIRTS = [
   {n:'紅色',c:'#e53935'},{n:'藍色',c:'#1e63d6'},{n:'綠色',c:'#2e9e44'},{n:'黃色',c:'#fdd835'},
   {n:'白色',c:'#f4f4f4'},{n:'黑色',c:'#1c1c1c'},{n:'紫色',c:'#8e24aa'},{n:'橘色',c:'#fb8c00'},
@@ -1763,7 +1780,7 @@ function renderJobs(){
     const at = new Date(j.at||Date.now()).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
     return `<div class="job" style="--sev:${sevC}">
       <div class="jtop"><span class="jid">#${j.id.toUpperCase()}｜${at}</span><span class="stars">${'★'.repeat(j.stars)}${'☆'.repeat(3-j.stars)}</span></div>
-      <div class="from">來自：${nick?`<span class="redact">${nick}</span>．`:''}${who}</div>
+      <div class="from">委託人：${nick?`<span class="redact">${nick}</span>．`:''}${who}</div>
       <div class="msg"><span class="${isNew?'enc':''}" data-id="${j.id}">${isNew ? scrambleText(j.msg) : j.msg}</span></div>
       <div class="meta"><span>要求：<b class="req">${reqChain(j.req.steps)}</b></span></div>
       ${j.unlocked ? `<div class="intel${j.id===justUnlocked?' reveal':''}">
@@ -1876,7 +1893,7 @@ $('startBox').addEventListener('click', e=>{
   if(b.dataset.tab){ renderTerminal(); showTab(b.dataset.tab); }
   else if(b.dataset.job){ const j=jobs.find(x=>x.id===b.dataset.job); if(j && j.unlocked) openLoadout(j); }
   else if(b.dataset.unlock){ const j=jobs.find(x=>x.id===b.dataset.unlock); if(!j || j.unlocked) return;
-    if(save.money>=UNLOCK_COST) spend(UNLOCK_COST, b, ()=>{ j.unlocked=true; justUnlocked=j.id; renderTerminal(); });
+    if(save.money>=UNLOCK_COST) spend(UNLOCK_COST, b, ()=>{ j.unlocked=true; justUnlocked=j.id; saveJobs(); renderTerminal(); });
     else denyFx(b); }
   else if(b.dataset.buy){ const [k,n]=b.dataset.buy.split(':'), cost=priceOf(AMMO_TYPES[k].price)*(+n);
     if(save.money>=cost) spend(cost, b, ()=>{ save.ammo[k]=(save.ammo[k]||0)+(+n); persist(); renderTerminal(); });
@@ -1890,10 +1907,7 @@ $('startBox').addEventListener('click', e=>{
     else if(lv<u.vals.length-1) denyFx(b); }
   else if(b.id==='refreshJobs'){   // 每次刷新扣 $50
     if(save.money<REFRESH_COST){ denyFx(b); showDialog({title:'錢不夠', msg:`刷新委託要 ${money(REFRESH_COST)}，你現在只有 ${money(save.money)}。`, ok:'知道了'}); return; }
-    spend(REFRESH_COST, b, ()=>{ refreshJobs(); renderTerminal();
-$('dnOnion').textContent = 'nmk' + hexStr(7).slice(0,13) + '…onion';
-setInterval(()=>{ if(!$('overlay').classList.contains('hidden')) $('dnPing').textContent = 380 + Math.floor(Math.random()*260); }, 1200);
-dnBoot(); }); }
+    spend(REFRESH_COST, b, ()=>{ refreshJobs(); renderTerminal(); }); }
   else if(b.id==='resetSave'){
     showDialog({title:'清除存檔？', msg:'資金、彈藥、裝備、聲望都會重置，而且無法復原。', ok:'清除存檔', cancel:'取消', danger:true})
       .then(yes=>{ if(yes){ save=NEW_SAVE(); persist(); refreshJobs(); renderTerminal(); showTab('jobs'); } });
@@ -1964,7 +1978,7 @@ async function startGame(j, load){
   placeShooter(zc, pool); initWind(DIFF[j.stars].windMax);
   setupRound();
   // 接下的委託從清單移除，補一件新的
-  jobs = jobs.filter(x=>x!==j); jobs.push(makeJob());
+  jobs = jobs.filter(x=>x!==j); jobs.push(makeJob()); saveJobs();
   state='play'; zoomStyle();
   $('overlay').classList.add('hidden');
   loading = false; $('loadMsg').textContent='';
@@ -2050,7 +2064,12 @@ addEventListener('blur', ()=>{ holding=false; });
 
 map.setView(DISTRICTS.xinyi.c, 15);
 zoomStyle();
-refreshJobs(); renderTerminal();
+if(loadJobs()) jobs.forEach(j=>seenJobs.add(j.id));   // 有存下來的委託就沿用（之前看過，不再播解密動畫）
+else refreshJobs();                                    // 沒有才抓新的
+renderTerminal();
+$('dnOnion').textContent = 'nmk' + hexStr(7).slice(0,13) + '…onion';
+setInterval(()=>{ if(!$('overlay').classList.contains('hidden')) $('dnPing').textContent = 380 + Math.floor(Math.random()*260); }, 1200);
+dnBoot();
 // 除錯介面：網址加上 ?debug 才開放（例如 index.html?debug）
 if(/[?&]debug\b/.test(location.search)){
   window.skyMap = map;
