@@ -324,8 +324,16 @@
   .job .jfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;padding-top:10px}
   .job .pay{color:var(--dn-amber);font-size:16px;font-weight:normal}
   .job .sig{font-size:11px;color:var(--dn-mute);opacity:.7;margin-top:6px;word-break:break-all}
-  .job .stamp{position:absolute;right:12px;top:36px;transform:rotate(-12deg);font-size:14px;font-weight:bold;letter-spacing:2px;padding:1px 6px;
-       border:2px solid #ff3b5c;color:#ff3b5c;opacity:.55;pointer-events:none}
+  /* 結案的委託：整張變暗，右上角蓋一個斜的「結案」章（成功＝綠、失敗＝琥珀） */
+  .job.closed > :not(.stamp){opacity:.45}
+  .job.closed{border-style:dashed}
+  .job .stamp{position:absolute;right:14px;top:30px;transform:rotate(-10deg);font-size:18px;font-weight:bold;letter-spacing:3px;padding:2px 10px;
+       border:2px solid var(--dn-hi);color:var(--dn-hi);box-shadow:0 0 10px var(--dn-glow),inset 0 0 8px var(--dn-glow);text-shadow:0 0 6px var(--dn-glow);
+       background:rgba(0,0,0,.55);pointer-events:none;white-space:nowrap}
+  .job .stamp small{display:block;font-size:12px;letter-spacing:1px;font-weight:normal;text-align:center}
+  .job.fail .stamp{border-color:var(--dn-amber);color:var(--dn-amber);box-shadow:0 0 10px rgba(255,180,60,.35);text-shadow:none}
+  #sRep{display:inline-block;transition:color .4s}
+  #sRep.spend{color:#ff5c7a;animation:moneyHit .45s ease-out}
   .job .ped{position:relative;display:inline-block;margin:0;--s:22px;vertical-align:middle}
   #overlay .job .jfoot button{margin:0;padding:6px 14px;font-size:14px;background:transparent;color:var(--dn-ink);border:1px solid var(--dn-ink);border-radius:3px;font-weight:normal;letter-spacing:1px}
   #overlay .job .jfoot button:not(:disabled):hover{background:var(--dn-ink);color:#020403;box-shadow:0 0 12px var(--dn-glow)}
@@ -436,7 +444,7 @@
     </div>
     <div class="tabpane" id="tab-jobs">
       <div id="jobAlert"></div>
-      <div class="row" style="justify-content:flex-end"><button class="small" id="refreshJobs">刷新委託（$50）</button></div>
+      <div class="row" style="justify-content:flex-end"><button class="small" id="refreshJobs">刷新委託（聲望 -5）</button></div>
       <div id="jobList"></div>
     </div>
     <div class="tabpane hidden" id="tab-ammo">
@@ -483,6 +491,7 @@
       <ul>
         <li>完美達成委託 +2～6（★ × 2），部分完成 +1，失敗 -3，每誤傷一個路人 -10。聲望可以是負的</li>
         <li><b>小費</b>：完成委託時額外拿到 聲望 × 5（聲望是負的就沒有小費）</li>
+        <li><b>委託清單</b>：一次 4 件。做完（成功或失敗）的委託會留在清單上標示「結案」，4 件都結案才會收到新的一批。不想做的可以按「刷新委託」換掉還沒結案的，每次扣 5 聲望</li>
         <li><b>解密情報</b>：委託的出沒地點、噁男特徵和現場狀況（時限、人潮、風速）是加密的，付 $5 解密後才看得到、才能接案</li>
         <li><b>學生委託</b>：國小、國高中、大學生、研究生沒什麼錢，酬勞很少，也沒有小費和時間獎金；有些甚至是<b>免費委託</b>，但完成後聲望加 3 倍</li>
         <li><b>售價</b>：聲望越高折扣越多，但越往上越難再便宜：聲望 50 約 9 折、100 約 85 折、300 約 78 折，最多 7 折。聲望是負的就會變貴（每 1 點貴 1%，最多貴 50%）</li>
@@ -928,7 +937,7 @@ function studentPay(cl, pay){
 }
 const payLabel = j => j.free ? '免費委託（聲望 ×3）' : j.stu ? `酬勞 ${money(j.pay)}（學生）` : `酬勞 ${money(j.pay)}`;
 const JOB_COUNT = 4;
-const REFRESH_COST = 50;   // 刷新委託的費用
+const REFRESH_REP = 5;   // 刷新委託扣的聲望（只換掉還沒結案的委託）
 function refreshJobs(){ jobs = []; for(let i=0;i<JOB_COUNT;i++) jobs.push(makeJob()); saveJobs(); }
 /* 目前的委託存進存檔：重新整理網頁不會變成免費刷新（解密過的也會記住）。
    衣裝存名字，讀回來時換回 HATS／SHIRTS／HAIRS 裡的同一個物件（程式用 === 比對有沒有戴帽子） */
@@ -944,6 +953,7 @@ function loadJobs(){
     return {...j, o};
   });
   if(back.some(j=>!j)) return false;   // 存檔裡的委託格式不對（舊版存檔）就重抓
+  for(const j of back) if(j.active && !j.closed){ j.active=false; j.closed='fail'; j.gain=0; }   // 出擊到一半關掉網頁＝失敗
   jobs = back; return true;
 }
 const SHIRTS = [
@@ -1842,6 +1852,7 @@ function renderJobs(){
   if(ammoTotal()<=0 && save.money<priceOf(AMMO_TYPES.std.price)){ save.ammo.std=3; persist(); alert='<div class="alert info">🤝 黑市老朋友先賒你 3 發標準彈。</div>'; }
   if(ammoTotal()<=0) alert = '<div class="alert">⚠ 沒有子彈了！先到「彈藥庫」購買彈藥才能接案。<button data-tab="ammo">前往彈藥庫</button></div>';
   $('jobAlert').innerHTML = alert;
+  $('refreshJobs').disabled = !jobs.some(j=>!j.closed);
   const canGo = ammoTotal()>0 && !loading;
   const fresh = [];
   $('jobList').innerHTML = jobs.map(j=>{
@@ -1849,7 +1860,9 @@ function renderJobs(){
     const [nick, who] = j.client.includes('．') ? j.client.split('．') : ['', j.client];
     const isNew = !seenJobs.has(j.id); if(isNew){ seenJobs.add(j.id); fresh.push(j.id); }
     const at = new Date(j.at||Date.now()).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
-    return `<div class="job" style="--sev:${sevC}">
+    const cls = j.closed ? ` closed ${j.closed}` : '';
+    const stamp = j.closed ? `<div class="stamp">結案・${j.closed==='win'?'成功':'失敗'}<small>${j.closed!=='win' ? '沒有酬勞' : j.free ? `聲望 +${j.repD||0}` : '實得 '+money(j.gain||0)}</small></div>` : '';
+    return `<div class="job${cls}" style="--sev:${sevC}">${stamp}
       <div class="jtop"><span class="jid">#${j.id.toUpperCase()}｜${at}</span><span class="stars">${'★'.repeat(j.stars)}${'☆'.repeat(3-j.stars)}</span></div>
       <div class="from">委託人：${nick?`<span class="redact">${nick}</span>．`:''}${who}</div>
       <div class="msg"><span class="${isNew?'enc':''}" data-id="${j.id}">${isNew ? scrambleText(j.msg) : j.msg}</span></div>
@@ -1861,8 +1874,8 @@ function renderJobs(){
         </div>
         <div class="meta sub" style="margin-top:4px"><span data-dec>時限 ${mmss(D.time)}．人潮 ${D.peds}．風速最高 ${D.windMax} m/s</span></div>
       </div>` : ''}
-      <div class="jfoot"><span class="pay">${payLabel(j)}</span>${j.unlocked
-        ? `<button data-job="${j.id}" ${canGo?'':'disabled'}>接案</button>`
+      <div class="jfoot"><span class="pay">${payLabel(j)}</span>${j.closed ? ''
+        : j.unlocked ? `<button data-job="${j.id}" ${canGo?'':'disabled'}>接案</button>`
         : `<button data-unlock="${j.id}">解密情報（${money(UNLOCK_COST)}）</button>`}</div>
       <div class="sig">-----PGP SIGNATURE----- ${j.sig||''}</div>
     </div>`;
@@ -1951,6 +1964,13 @@ function payFx(btn, from, cost){
   };
   requestAnimationFrame(step);
 }
+function repFx(btn, n){   // 扣聲望的回饋：按鈕與聲望數字旁飄出「-5 聲望」，聲望數字閃紅
+  denySound();
+  flyText(btn, `-${n} 聲望`);
+  const m = $('sRep'); if(!m) return;
+  flyText(m, `-${n}`);
+  m.classList.remove('spend'); void m.offsetWidth; m.classList.add('spend'); setTimeout(()=>m.classList.remove('spend'), 700);
+}
 function denyFx(btn){ denySound(); if(btn){ btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); flyText(btn, '資金不足', 'deny'); } }
 // 先扣款、重繪畫面，再對重繪後同一個位置的按鈕播回饋（重繪會換掉按鈕元素）
 function spend(cost, btn, after){
@@ -1962,7 +1982,7 @@ function spend(cost, btn, after){
 $('startBox').addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b || b.disabled) return;
   if(b.dataset.tab){ renderTerminal(); showTab(b.dataset.tab); }
-  else if(b.dataset.job){ const j=jobs.find(x=>x.id===b.dataset.job); if(j && j.unlocked) openLoadout(j); }
+  else if(b.dataset.job){ const j=jobs.find(x=>x.id===b.dataset.job); if(j && j.unlocked && !j.closed) openLoadout(j); }
   else if(b.dataset.unlock){ const j=jobs.find(x=>x.id===b.dataset.unlock); if(!j || j.unlocked) return;
     if(save.money>=UNLOCK_COST) spend(UNLOCK_COST, b, ()=>{ j.unlocked=true; justUnlocked=j.id; saveJobs(); renderTerminal(); });
     else denyFx(b); }
@@ -1976,9 +1996,12 @@ $('startBox').addEventListener('click', e=>{
     const c=priceOf(u.cost[lv]||0);
     if(lv<u.vals.length-1 && save.money>=c) spend(c, b, ()=>{ save.up[k]++; persist(); renderTerminal(); });
     else if(lv<u.vals.length-1) denyFx(b); }
-  else if(b.id==='refreshJobs'){   // 每次刷新扣 $50
-    if(save.money<REFRESH_COST){ denyFx(b); showDialog({title:'錢不夠', msg:`刷新委託要 ${money(REFRESH_COST)}，你現在只有 ${money(save.money)}。`, ok:'知道了'}); return; }
-    spend(REFRESH_COST, b, ()=>{ refreshJobs(); renderTerminal(); }); }
+  else if(b.id==='refreshJobs'){   // 每次刷新扣 5 聲望；結案的委託留著，只換掉還沒結案的
+    if(!jobs.some(j=>!j.closed)) return;
+    const r = b.getBoundingClientRect();
+    save.rep -= REFRESH_REP;
+    jobs = jobs.map(j=>j.closed ? j : makeJob()); saveJobs(); renderTerminal();
+    repFx({getBoundingClientRect:()=>r}, REFRESH_REP); }
   else if(b.id==='resetSave'){
     showDialog({title:'清除存檔？', msg:'資金、彈藥、裝備、聲望都會重置，而且無法復原。', ok:'清除存檔', cancel:'取消', danger:true})
       .then(yes=>{ if(yes){ save=NEW_SAVE(); persist(); refreshJobs(); renderTerminal(); showTab('jobs'); } });
@@ -2048,8 +2071,8 @@ async function startGame(j, load){
   $('hCity').textContent=`台北市${dist.name}`;
   placeShooter(zc, pool); initWind(DIFF[j.stars].windMax);
   setupRound();
-  // 接下的委託從清單移除，補一件新的
-  jobs = jobs.filter(x=>x!==j); jobs.push(makeJob()); saveJobs();
+  // 接下的委託留在清單上，結束後標成結案（重新整理網頁也算失敗）
+  j.active = true; saveJobs();
   state='play'; zoomStyle();
   $('overlay').classList.add('hidden');
   loading = false; $('loadMsg').textContent='';
@@ -2092,7 +2115,9 @@ function endGame(win, reason){
     repD = -3 - civKills*CIV_REP;
     rows = `<tr><td>${reason}</td><td class="neg">沒有酬勞</td></tr>`;
   }
-  save.money += gain; save.rep += repD; persist();   // 聲望可以是負的
+  save.money += gain; save.rep += repD;   // 聲望可以是負的
+  job.active = false; job.closed = win ? 'win' : 'fail'; job.gain = gain; job.repD = repD;
+  saveJobs();
   $('endTitle').textContent = win ? '✔ 委託完成' : '✘ 委託失敗';
   $('endTitle').style.color = win ? 'var(--accent)' : 'var(--warn)';
   $('endTxt').innerHTML = `<table class="result">${rows}
@@ -2108,7 +2133,9 @@ function endGame(win, reason){
 $('againBtn').onclick=()=>{
   $('endBox').classList.add('hidden'); $('startBox').classList.remove('hidden'); $('overlay').classList.remove('endMode');
   $('endBox').classList.remove('folded'); $('endFold').textContent='收起 ▾';
-  state='idle'; updRange(); renderTerminal(); showTab('jobs');
+  state='idle'; updRange();
+  if(jobs.every(j=>j.closed)) refreshJobs();   // 四件都結案了，才收到一批新委託
+  renderTerminal(); showTab('jobs');
 };
 $('endFold').onclick=()=>{ const f=$('endBox').classList.toggle('folded'); $('endFold').textContent = f ? '展開 ▴' : '收起 ▾'; };
 $('fire').onclick=fire;
@@ -2135,7 +2162,7 @@ addEventListener('blur', ()=>{ holding=false; });
 
 map.setView(DISTRICTS.xinyi.c, 15);
 zoomStyle();
-if(loadJobs()) jobs.forEach(j=>seenJobs.add(j.id));   // 有存下來的委託就沿用（之前看過，不再播解密動畫）
+if(loadJobs()){ jobs.forEach(j=>seenJobs.add(j.id)); if(jobs.every(j=>j.closed)) refreshJobs(); }   // 有存下來的委託就沿用（之前看過，不再播解密動畫）
 else refreshJobs();                                    // 沒有才抓新的
 renderTerminal();
 $('dnOnion').textContent = 'nmk' + hexStr(7).slice(0,13) + '…onion';
@@ -2145,7 +2172,7 @@ dnBoot();
 if(/[?&]debug\b/.test(location.search)){
   window.skyMap = map;
   window.nmkDebug = { get target(){ return target; }, get save(){ return save; }, ballistics:a=>ballistics(a), fire,
-    partAtLocal, bloodHit, get peds(){ return peds; }, get map(){ return map; }, CLIENTS, makeClient, CL_COUNT, INCIDENTS, makeJob, incidentCount, pickIncident,
+    partAtLocal, bloodHit, endGame:(w,r)=>endGame(w,r), get jobs(){ return jobs; }, get peds(){ return peds; }, get map(){ return map; }, CLIENTS, makeClient, CL_COUNT, INCIDENTS, makeJob, incidentCount, pickIncident,
     get timeLeft(){ return timeLeft; }, set timeLeft(v){ timeLeft=v; }, get state(){ return state; },
     sfx:{gunSound, boltSound, tickSound, alarmSound, stepCountdown}, get actx(){ return actx; },
     // 把行人可以走的路網畫在地圖上（檢查道路資料用）；再呼叫一次就關掉
