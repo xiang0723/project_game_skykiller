@@ -49,7 +49,7 @@ async function overpass(q) {
     for (const url of SERVERS) {
       try {
         const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q),
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'skykiller-prototype/0.2' } });
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'skykiller-prototype/0.3' } });
         if (res.ok) { const j = await res.json(); if (j.elements?.length) return j; console.log('  空結果'); }
         else console.log(`  ${new URL(url).host} -> ${res.status}`);
       } catch (e) { console.log(`  ${new URL(url).host} -> ${e.message}`); }
