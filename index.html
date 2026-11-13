@@ -482,7 +482,7 @@
       <h3>聲望</h3>
       <ul>
         <li>完美達成委託 +2～6（★ × 2），部分完成 +1，失敗 -3，每誤傷一個路人 -10。聲望可以是負的</li>
-        <li><b>小費</b>：完成委託時額外拿到 聲望 × 10（聲望是負的就沒有小費）</li>
+        <li><b>小費</b>：完成委託時額外拿到 聲望 × 5（聲望是負的就沒有小費）</li>
         <li><b>解密情報</b>：委託的出沒地點、噁男特徵和現場狀況（時限、人潮、風速）是加密的，付 $5 解密後才看得到、才能接案</li>
         <li><b>學生委託</b>：國小、國高中、大學生、研究生沒什麼錢，酬勞很少，也沒有小費和時間獎金；有些甚至是<b>免費委託</b>，但完成後聲望加 3 倍</li>
         <li><b>售價</b>：聲望越高折扣越多，但越往上越難再便宜：聲望 50 約 9 折、100 約 85 折、300 約 78 折，最多 7 折。聲望是負的就會變貴（每 1 點貴 1%，最多貴 50%）</li>
@@ -495,7 +495,7 @@
         <li>噁男的特徵只有兩項：<b>帽子顏色</b>（可能沒戴）和<b>上衣顏色</b>。現場不會有兩項都一樣的人，但會有同上衣不同帽子、同帽子不同上衣的誘餌。髮色只是裝飾，不用管</li>
         <li>打中非致命部位，噁男會倒地，只能在地上緩慢爬行；<b>頭部、頸部、胸口</b>是致命部位。他死了還是可以繼續補槍（鞭屍）完成要求</li>
         <li>指定部位全部打到就算完成，不一定要打死他</li>
-        <li><b>完美達成</b>（全部照順序）＝全額酬勞＋時間獎金；順序不對或只打中部分＝ 80% × 完成度（例如 4 個中了 2 個＝ 40%）</li>
+        <li><b>完美達成</b>（全部照順序）＝全額酬勞＋時間獎金（剩餘每秒 $2）；順序不對或只打中部分＝ 80% × 完成度（例如 4 個中了 2 個＝ 40%）</li>
         <li>一個指定部位都沒打到、只把他打死，只能領 10%</li>
         <li>打中過指定部位或噁男已死，就能按「收工撤離」依完成度結算</li>
       </ul>
@@ -720,10 +720,11 @@ try{
 function persist(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }catch(e){} }
 const U = k => UPGRADES[k].vals[save.up[k]];
 /* 聲望：折扣 = 30% × 聲望 ÷ (聲望 + 100)，越高越難再往上加（50 約 9 折、100 約 85 折、300 約 78 折，最多 7 折）；
-   聲望是負的就變貴，每 1 點貴 1%，最多貴 50%。完成任務的小費 = 聲望 × 10（負的就沒有） */
+   聲望是負的就變貴，每 1 點貴 1%，最多貴 50%。完成任務的小費 = 聲望 × 5（負的就沒有） */
 const repRate = () => save.rep >= 0 ? -0.3*save.rep/(save.rep+100) : Math.min(0.5, -save.rep*0.01);
 const priceOf = base => Math.round(base*(1+repRate())/10)*10;
-const tipOf = () => Math.max(0, save.rep*10);
+const tipOf = () => Math.max(0, save.rep*TIP_PER_REP);
+const TIP_PER_REP = 5, TIME_BONUS = 2;   // 小費 = 聲望 × 5；時間獎金 = 剩餘每秒 $2
 const ammoTotal = () => AMMO_KEYS.reduce((s,k)=>s+(save.ammo[k]||0), 0);
 const money = n => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -2075,7 +2076,7 @@ function endGame(win, reason){
     const steps = job.req.steps, full = perfect();
     const ratio = payRatio();
     const base = Math.round(job.pay*ratio/100)*100;
-    const bonus = full && !job.stu ? Math.round(t*5/100)*100 : 0;   // 剩餘每秒 $5，只有完全達成才有（學生委託沒有）
+    const bonus = full && !job.stu ? Math.round(t*TIME_BONUS/10)*10 : 0;   // 剩餘每秒 $2，只有完全達成才有（學生委託沒有）
     const cut = Math.round(base*Math.min(1, civKills*CIV_PAY_CUT));
     const tip = job.stu ? 0 : tipOf();   // 小費：依完成任務當下的聲望（學生付不起小費）
     gain = Math.max(0, base + bonus - cut) + tip;
@@ -2086,7 +2087,7 @@ function endGame(win, reason){
             ${job.free ? '<tr><td>委託酬勞</td><td>免費委託（聲望 ×3）</td></tr>' : `<tr><td>委託酬勞${full?'':`（${Math.round(ratio*100)}%）`}</td><td class="pos">+${money(base)}</td></tr>`}
             ${full?`<tr><td>時間獎金（剩 ${t} 秒）</td><td class="pos">+${money(bonus)}</td></tr>`:''}
             ${civKills?`<tr><td>誤傷 ${civKills} 人</td><td class="neg">-${money(cut)}</td></tr>`:''}
-            <tr><td>小費${job.stu ? '' : `（聲望 ${save.rep} × 10）`}</td><td class="${tip>0?'pos':''}">${tip>0 ? '+'+money(tip) : job.stu ? '學生付不起小費' : '沒有小費'}</td></tr>`;
+            <tr><td>小費${job.stu ? '' : `（聲望 ${save.rep} × ${TIP_PER_REP}）`}</td><td class="${tip>0?'pos':''}">${tip>0 ? '+'+money(tip) : job.stu ? '學生付不起小費' : '沒有小費'}</td></tr>`;
   }else{
     repD = -3 - civKills*CIV_REP;
     rows = `<tr><td>${reason}</td><td class="neg">沒有酬勞</td></tr>`;
