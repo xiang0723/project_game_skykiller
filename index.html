@@ -117,12 +117,16 @@
   #fire{position:fixed;z-index:600;right:16px;bottom:16px;width:96px;height:96px;border-radius:50%;
        border:2px solid var(--warn);background:rgba(120,0,0,.6);color:#fff;font:bold 18px inherit;font-family:inherit;cursor:pointer}
   #fire:active{background:rgba(200,0,0,.8)}
-  /* 地圖圖資聲明放在左欄最下面，不再用 Leaflet 右下角的那條（會擋到開火鈕和撤離鈕） */
-  #credit{font-size:10px;line-height:1.4;color:rgba(216,245,208,.55);padding:0 4px;text-shadow:0 0 2px #000}
-  #credit a{color:inherit}
+  /* 地圖圖資聲明：螢幕最下緣一行極小的淡字（bottom 0~11px），其他介面元件都在 bottom 16px 以上，彼此不重疊；
+     不攔截點擊（只有連結本身可以點），也壓在所有面板與對話框底下 */
+  #credit{position:fixed;z-index:550;left:50%;bottom:1px;transform:translateX(-50%);max-width:calc(100vw - 8px);
+       font-size:8px;line-height:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+       color:rgba(255,255,255,.28);pointer-events:none}
+  #credit a{color:inherit;text-decoration:none;pointer-events:auto}
+  @media (max-width:420px){ #credit{font-size:7px} }
   #ammoBar{font-size:12px;padding:6px 8px;display:flex;flex-wrap:wrap;gap:4px}
   @media (max-width:760px){
-    #side.collapsed #ammoBar{position:fixed;left:10px;bottom:10px;max-width:calc(100vw - 230px);padding:4px}
+    #side.collapsed #ammoBar{position:fixed;left:10px;bottom:16px;max-width:calc(100vw - 230px);padding:4px}
     #side:not(.collapsed){max-height:calc(100vh - 140px)}
     #toast{top:auto;bottom:130px}
     #toast div{font-size:13px}
@@ -280,8 +284,8 @@
     <div id="log">待命中…</div>
   </div>
   <div id="ammoBar" class="panel hidden"></div>
-  <div id="credit">衛星圖 &copy; Esri, Maxar, Earthstar Geographics｜道路 &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 貢獻者｜<a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a></div>
 </div>
+<div id="credit">衛星圖 &copy; Esri, Maxar, Earthstar Geographics｜道路 &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 貢獻者｜<a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a></div>
 <div id="toast"></div>
 <div id="breath"><i></i></div>
 <button id="fire">開火<br><small>SPACE</small></button>
@@ -864,7 +868,7 @@ $('modal').addEventListener('click', e=>{ if(e.target.id==='modal' && !$('modalC
 
 /* ---------- 地圖 ---------- */
 const map = L.map('map', {
-  zoomControl:false, attributionControl:false,   // 圖資聲明改放在左欄 #credit
+  zoomControl:false, attributionControl:false,   // 圖資聲明改放在螢幕最下緣的 #credit
   maxBoundsViscosity:1.0,   // 邊界是硬牆：不回彈、不自動拉回
   scrollWheelZoom:'center', doubleClickZoom:'center', touchZoom:'center',
   minZoom:15, maxZoom:24, zoomSnap:1, inertia:true, keyboard:false,
