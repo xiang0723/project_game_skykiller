@@ -17,7 +17,9 @@
   .pedicon{background:none;border:none}
   .ped{position:absolute;width:var(--s);height:var(--s);margin:calc(var(--s)/-2) 0 0 calc(var(--s)/-2);
        border-radius:50%;background:var(--shirt);box-shadow:0 0 0 1px rgba(0,0,0,.65),0 1px 3px rgba(0,0,0,.6)}
-  .ped i{position:absolute;left:27%;top:27%;width:46%;height:46%;border-radius:50%;background:var(--hat);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+  /* 頭頂：戴帽子＝大顆鮮豔色圓＋黑框；沒戴帽子＝只有一小點深色頭髮（禿頭是膚色），沒有框 */
+  .ped i{position:absolute;left:18%;top:18%;width:64%;height:64%;border-radius:50%;background:var(--hat);box-shadow:0 0 0 1.5px #000}
+  .nohat .ped i{left:36%;top:36%;width:28%;height:28%;background:var(--hair);box-shadow:none}
   .d0 .ped{background:#cfcfcf}
   .d0 .ped i,.d1 .ped i{display:none}
   .dead .ped,.ped.dead{background:#5a0000 !important;opacity:.85}
@@ -271,7 +273,7 @@
     <h3>▌噁男檔案</h3>
     <div id="dJob" style="opacity:.85;margin-bottom:4px"></div>
     <div class="pv"><div id="dPv"></div><div id="dTxt"></div></div>
-    <details id="dTip"><summary>怎麼從俯視認人？</summary>只看兩項：<b>帽子顏色</b>（可能沒戴，沒戴就直接看到頭髮）和<b>上衣顏色</b>。×18 看得出上衣、×19 看得出帽子，髮色不算特徵。帽簷朝前，左右以噁男本人為準</details>
+    <details id="dTip"><summary>怎麼從俯視認人？</summary>只看兩項：<b>帽子顏色</b>和<b>上衣顏色</b>。×18 看得出上衣；×19 起，戴帽子的人頭上是<b>一大顆鮮豔色圓</b>（白、綠、紅、黃、藍），沒戴帽子的只有<b>一小點深色頭髮</b>。帽簷朝前，左右以噁男本人為準</details>
     <h3 class="sec">▌委託進度</h3>
     <div id="dReq"></div>
     <h3 class="sec">▌戰況</h3>
@@ -495,9 +497,9 @@ function figSVG(){
                           `<line x1="${p.a[0]}" y1="${Y(p.a[1])}" x2="${p.b[0]}" y2="${Y(p.b[1])}" stroke="${col(p.fill)}" stroke-width="${p.w}" stroke-linecap="round"/>`;
     else s += `<circle cx="${p.c[0]}" cy="${Y(p.c[1])}" r="${p.r}" fill="${col(p.fill)}" stroke="rgba(0,0,0,.55)" stroke-width=".0125"/>`;
   }
-  // 帽子（比頭小一圈，周圍露出一圈髮色）＋帽簷（標示面朝方向，分辨左右用）；沒戴帽的人只畫鼻尖
-  s += `<g class="hatg"><circle cx="0" cy="${Y(0.53)}" r="0.105" fill="var(--hat)" stroke="rgba(0,0,0,.45)" stroke-width=".012"/>`+
-       `<ellipse cx="0" cy="${Y(0.68)}" rx="0.1" ry="0.05" fill="var(--hat)" stroke="rgba(0,0,0,.55)" stroke-width=".015"/></g>`;
+  // 帽子（比頭大一圈、黑色粗框，蓋住整顆頭）＋帽簷（標示面朝方向，分辨左右用）；沒戴帽的人只看到深色頭髮和鼻尖
+  s += `<g class="hatg"><ellipse cx="0" cy="${Y(0.70)}" rx="0.12" ry="0.065" fill="var(--hat)" stroke="#000" stroke-width=".022"/>`+
+       `<circle cx="0" cy="${Y(0.53)}" r="0.165" fill="var(--hat)" stroke="#000" stroke-width=".022"/></g>`;
   s += `<circle class="nose" cx="0" cy="${Y(0.675)}" r="0.03" fill="var(--skin)" stroke="rgba(0,0,0,.5)" stroke-width=".01"/>`;
   s += `<g class="xmark"><line x1="-.3" y1="-.4" x2=".3" y2=".2"/><line x1=".3" y1="-.4" x2="-.3" y2=".2"/></g>`;
   return `<svg class="fig" viewBox="-1.1 -1.3 2.2 2.6"><g class="body" transform="scale(__SX__,__SY__)">${s}</g></svg>`;
@@ -762,12 +764,13 @@ const SHIRTS = [
 ];
 const SKIN = '#d9a273';
 const HATS = [
-  {n:'沒戴帽子',c:SKIN},{n:'白色帽子',c:'#ffffff'},{n:'黑色帽子',c:'#000000'},
+  {n:'沒戴帽子',c:SKIN},{n:'白色帽子',c:'#ffffff'},{n:'綠色帽子',c:'#00e676'},
   {n:'紅色帽子',c:'#ff1744'},{n:'黃色帽子',c:'#ffea00'},{n:'藍色帽子',c:'#2979ff'},
 ];
 /* 辨識特徵只有兩項：帽子顏色（可能沒戴）、上衣顏色。×18 看得出上衣、×19 看得出帽子。
    髮色、褲子顏色只是讓畫面不單調的裝飾，不是特徵。 */
-const HAIRS = [{n:'黑髮',c:'#141414'},{n:'棕髮',c:'#7a4a24'},{n:'金髮',c:'#e0b84a'},{n:'白髮',c:'#ececec'},{n:'紅髮',c:'#c0391b'},{n:'禿頭',c:SKIN}];
+// 帽子一律是鮮豔色（白、綠、紅、黃、藍），頭髮只用深色或禿頭，俯視時「有沒有戴帽子」一眼就分得出來
+const HAIRS = [{n:'黑髮',c:'#141414'},{n:'深棕髮',c:'#3d2614'},{n:'灰黑髮',c:'#3a3a3a'},{n:'禿頭',c:SKIN}];
 const PANTS = ['#2b3a55','#262626','#4a3a2c','#3c4048','#34495e'];
 const OUT_POOL = {hat:HATS, shirt:SHIRTS};
 const OUT_KEYS = Object.keys(OUT_POOL);
