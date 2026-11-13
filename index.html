@@ -47,6 +47,11 @@
   .fig .wound{fill:#d10000;stroke:#ff8a8a;stroke-width:.015}
   .fig .xmark{stroke:#ff2020;stroke-width:.08;stroke-linecap:round;display:none}
   .pw.dead .xmark{display:block}
+  /* 麻醉昏睡：原地不動，頭上飄 Zzz */
+  .pw.sleep .fig{filter:saturate(.6) drop-shadow(0 1px 2px rgba(0,0,0,.7))}
+  .pw.sleep::after{content:"z Z";position:absolute;left:calc(var(--m)*.6px);top:calc(var(--m)*-2.2px);font:bold 13px monospace;color:#9fe8ff;
+       text-shadow:0 0 4px #000,0 0 6px rgba(120,220,255,.8);white-space:nowrap;pointer-events:none;animation:zzz 1.6s ease-in-out infinite}
+  @keyframes zzz{0%{transform:translateY(4px);opacity:0}30%{opacity:1}100%{transform:translateY(-8px);opacity:0}}
   .impact{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;
        border:2px solid rgba(255,230,150,.9);animation:imp .8s ease-out forwards}
   /* 血跡：大小以公尺計（--m = 每公尺幾像素），跟著地圖倍率縮放 */
@@ -653,7 +658,7 @@ const MAX_CARRY = 10;      // 每次出擊最多帶 10 發
 
 /* ---------- 彈藥 ----------
    v = 彈速倍率、wind = 風偏倍率、spread = 散布倍率、tol = 命中判定放寬（基準公尺）、panic = 槍聲驚動倍率
-   nonlethal = 打哪裡都不致命、allLethal = 打哪裡都致命、splash = 波及半徑（公尺）、guided = 自動修正 */
+   tranq = 麻醉（只讓人昏睡不動，不濺血、不做部位判定）、allLethal = 打哪裡都致命、splash = 波及半徑（公尺）、guided = 自動修正 */
 const AMMO_TYPES = {
   std:   {nm:'標準彈',   price:200,  v:1,    wind:1,    spread:1,    tol:0,    panic:1,    ds:'最普通的全金屬被甲彈，沒有任何特性。'},
   hv:    {nm:'高速彈',   price:450,  v:1.4,  wind:0.75, spread:1,    tol:0,    panic:1.3,  ds:'彈速 +40%，提前量與風偏都變小；槍聲比較大。'},
@@ -661,7 +666,7 @@ const AMMO_TYPES = {
   prec:  {nm:'競賽級精準彈', price:550, v:1, wind:1,    spread:0.25, tol:0,    panic:1,    ds:'手工裝填，隨機散布只剩 25%，適合打手掌、膝蓋這種小部位。'},
   hp:    {nm:'擴張彈',   price:500,  v:0.95, wind:1.1,  spread:1,    tol:0.06, panic:1,    ds:'命中後彈頭擴張，命中判定範圍變大；稍微慢一點、比較吃風。'},
   sub:   {nm:'亞音速彈', price:400,  v:0.65, wind:1.4,  spread:1,    tol:0,    panic:0.2,  ds:'幾乎沒有槍聲，旁人不會受驚；但飛得很慢、很吃風。'},
-  tranq: {nm:'麻醉彈',   price:350,  v:0.75, wind:1.2,  spread:1.2,  tol:0,    panic:0.5,  nonlethal:true, ds:'打中任何部位都不致命，噁男會倒地，只能慢慢爬。打頭也不會死，適合先固定目標、照順序慢慢來。'},
+  tranq: {nm:'麻醉彈',   price:350,  v:0.75, wind:1.2,  spread:1.2,  tol:0,    panic:0.5,  tranq:true, ds:'打中任何部位都只會讓人昏睡、原地不動，不會濺血，也不算打中或打錯部位（不影響順序）。先把噁男定住，再換子彈照順序慢慢打。誤射路人一樣會扣錢扣聲望。'},
   frag:  {nm:'破片彈',   price:700,  v:0.9,  wind:1,    spread:1,    tol:0.15, panic:1.6,  allLethal:true, splash:2, ds:'命中範圍很大，但打中任何部位都致命；2 m 內的路人會被波及。'},
   guided:{nm:'導引彈',   price:2500, v:1,    wind:0,    spread:1,    tol:0,    panic:1,    guided:1, ds:'彈頭會自動修正：完全不受風影響，並追蹤準星附近的人，補上全部的移動提前量（一般子彈只補 60%）。'},
 };
@@ -1225,7 +1230,7 @@ function updRange(){
     let dx=b.drift[0], dy=b.drift[1], lead=false;
     if(comp>=2){
       let best=null, bd=AIM_LOCK_R*2;
-      for(const p of peds){ if(!p.alive || p.down || (p.wait>0 && p.panic<=0)) continue; const d0=meters(aim,p.ll); if(d0<bd){ bd=d0; best=p; } }
+      for(const p of peds){ if(!p.alive || p.down || p.sleep || (p.wait>0 && p.panic<=0)) continue; const d0=meters(aim,p.ll); if(d0<bd){ bd=d0; best=p; } }
       if(best){
         const spd = best.base*(best.panic>0 ? (best.isTarget?3.6:2.8) : 1), k=(1-AIM_LEAD)*spd*b.tof;
         dx -= Math.sin(best.hd)*k; dy -= Math.cos(best.hd)*k; lead=true;
@@ -1424,7 +1429,7 @@ function renderReq(){
     return `<span style="opacity:.6">${nm}</span>`;
   }).join(' → ') + `</div>` +
   `<div style="margin-top:4px">${next ? `下一槍：<b style="color:#ffd54a">${next}</b>` : '<b style="color:var(--accent)">指定部位全部完成</b>'}`+
-  `${target && !target.alive ? '　<span style="color:var(--warn)">（噁男已死，可以鞭屍）</span>' : target && target.down ? '　<span style="opacity:.8">（噁男倒地）</span>' : ''}</div>` +
+  `${target && !target.alive ? '　<span style="color:var(--warn)">（噁男已死，可以鞭屍）</span>' : target && target.sleep ? '　<span style="color:#9fe8ff">（噁男昏睡中）</span>' : target && target.down ? '　<span style="opacity:.8">（噁男倒地）</span>' : ''}</div>` +
   `<div class="pay"><span>完成度 ${covered}/${st.length}</span><span>目前可領 <b style="color:${pct>=100?'var(--accent)':'#ffd54a'}">${pct}%</b>${pct && !job.free ? `（${money(Math.round(job.pay*payRatio()/100)*100)}）` : ''}</span></div>` +
   `<div class="bar"><i style="width:${pct}%;${seqOk?'':'background:#ffb74d'}"></i></div>` +
   (seqOk ? '' : '<div style="color:#ffb74d;margin-top:3px">順序已亂：最多只能領 80%</div>');
@@ -1605,7 +1610,7 @@ function frame(now){
   const dt=Math.min(0.1,(now-last)/1000); last=now;
   if(state==='play'){
     for(const p of peds){
-      if(!p.alive) continue;
+      if(!p.alive || p.sleep) continue;   // 麻醉昏睡：原地不動
       if(p.down){   // 被打中非致命部位：倒地後沿著道路緩慢爬行，不會逃跑
         let d=CRAWL_V*dt;
         p.drip=(p.drip||0)+d; if(p.drip>0.5){ p.drip=0; addBlood(p.ll, rand(.25,.45), rand(0,6.28), 3, 0); }
@@ -1735,7 +1740,7 @@ function resolveShot(aim, aimed, ammoKey){
     if(h && (!hit || d < meters(aim,best.ll))){ hit=h; best=p; }
   }
   const PANIC_R = 70*U('silencer')*A.panic;
-  for(const p of peds) if(p.alive && !p.down && meters(aim,p.ll)<PANIC_R){ p.panic=rand(5,9); p.wait=0; }
+  for(const p of peds) if(p.alive && !p.down && !p.sleep && meters(aim,p.ll)<PANIC_R){ p.panic=rand(5,9); p.wait=0; }
   // 破片彈：落點附近的路人被波及
   if(A.splash){
     for(const p of peds) if(p.alive && !p.isTarget && p!==best && meters(aim,p.ll)<=A.splash){
@@ -1744,9 +1749,17 @@ function resolveShot(aim, aimed, ammoKey){
     }
   }
 
-  if(hit){
+  if(hit && A.tranq){
+    if(best.isTarget){
+      if(best.alive && !best.sleep){ best.sleep=true; best.root.classList.add('sleep'); log('💤 麻醉鏢命中噁男，他昏睡倒地、原地不動了（不算部位）', '#9fe8ff'); renderReq(); }
+      else log(best.alive ? '💤 噁男已經昏睡了，麻醉鏢沒有效果' : '💤 噁男已經死了，麻醉鏢沒有效果');
+    }else if(best.alive && !best.sleep){
+      best.sleep=true; best.root.classList.add('sleep'); civKills++;
+      log(`⚠ 麻醉鏢誤射路人（${best.shirt.n}上衣、${best.hat.n}）！酬勞 -${CIV_PAY_CUT*100}%、聲望 -${CIV_REP}`, 'var(--warn)');
+    }
+  }else if(hit){
     addWound(best, hit.x, hit.y);
-    bloodHit(best, A.nonlethal ? false : A.allLethal ? true : hit.part.lethal, hit.part.id);
+    bloodHit(best, A.allLethal ? true : hit.part.lethal, hit.part.id);
     if(best.isTarget){
       const st = job.req.steps, part = hit.part;
       let note = '';
@@ -1760,9 +1773,9 @@ function resolveShot(aim, aimed, ammoKey){
         else note = `　✘ 不是指定部位` + note;
       }
       const wasAlive = best.alive;
-      // 麻醉彈打哪都不致命；破片彈打哪都致命
-      const lethal = A.nonlethal ? false : A.allLethal ? true : part.lethal;
-      if(lethal && best.alive){ best.alive=false; best.down=true; best.root.classList.add('dead'); }
+      // 破片彈打哪都致命
+      const lethal = A.allLethal ? true : part.lethal;
+      if(lethal && best.alive){ best.alive=false; best.down=true; best.root.classList.add('dead'); best.root.classList.remove('sleep'); }
       else if(best.alive) best.down = true;   // 非致命部位：倒地，之後只能緩慢爬行
       renderReq();
       if(reqAllHit()){   // 指定部位全部打到：委託完成（照順序 = 完美達成）
@@ -1772,7 +1785,7 @@ function resolveShot(aim, aimed, ammoKey){
       const state2 = !best.alive ? (wasAlive ? '💀 死亡' : '鞭屍') : '倒地';
       log(`🎯 命中噁男【${part.nm}】${state2}${note}`, note.includes('✔') ? 'var(--accent)' : '#ffcc66');
     }else if(best.alive){
-      if(A.nonlethal){ best.down=true; } else { best.alive=false; best.root.classList.add('dead'); }
+      best.alive=false; best.root.classList.add('dead'); best.root.classList.remove('sleep');
       civKills++;
       log(`⚠ 誤傷路人（${best.shirt.n}上衣、${best.hat.n}）的${hit.part.nm}！酬勞 -${CIV_PAY_CUT*100}%、聲望 -${CIV_REP}`, 'var(--warn)');
     }
@@ -2172,7 +2185,7 @@ dnBoot();
 if(/[?&]debug\b/.test(location.search)){
   window.skyMap = map;
   window.nmkDebug = { get target(){ return target; }, get save(){ return save; }, ballistics:a=>ballistics(a), fire,
-    partAtLocal, bloodHit, endGame:(w,r)=>endGame(w,r), get jobs(){ return jobs; }, get peds(){ return peds; }, get map(){ return map; }, CLIENTS, makeClient, CL_COUNT, INCIDENTS, makeJob, incidentCount, pickIncident,
+    partAtLocal, bloodHit, endGame:(w,r)=>endGame(w,r), startGame:(j,l)=>startGame(j,l), resolveShot:(a,b,k)=>{ pending++; resolveShot(a,b,k); }, get civKills(){ return civKills; }, get jobs(){ return jobs; }, get peds(){ return peds; }, get map(){ return map; }, CLIENTS, makeClient, CL_COUNT, INCIDENTS, makeJob, incidentCount, pickIncident,
     get timeLeft(){ return timeLeft; }, set timeLeft(v){ timeLeft=v; }, get state(){ return state; },
     sfx:{gunSound, boltSound, tickSound, alarmSound, stepCountdown}, get actx(){ return actx; },
     // 把行人可以走的路網畫在地圖上（檢查道路資料用）；再呼叫一次就關掉
