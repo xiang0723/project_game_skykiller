@@ -12,6 +12,13 @@
   html,body{margin:0;height:100%;background:#000;color:var(--fg);font-family:"Consolas","Noto Sans TC",monospace;overflow:hidden}
   #map{position:absolute;inset:0;background:#111}
   .leaflet-container{background:#111}
+  /* 捲軸：細、深色軌道、磷光綠滑塊（和暗網終端同一套色） */
+  *{scrollbar-width:thin;scrollbar-color:rgba(120,255,140,.45) rgba(0,0,0,.35)}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-track{background:rgba(0,0,0,.35);border-left:1px solid rgba(80,255,120,.12)}
+  ::-webkit-scrollbar-thumb{background:rgba(120,255,140,.4);border-radius:0;box-shadow:0 0 6px rgba(80,255,120,.5) inset}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(160,255,175,.7)}
+  ::-webkit-scrollbar-corner{background:transparent}
 
   /* 行人 */
   .pedicon{background:none;border:none}
@@ -174,7 +181,7 @@
   #ammoBar button.on{border-color:#ffd54a;background:rgba(255,213,74,.16);box-shadow:0 0 0 1px #ffd54a inset,0 0 10px rgba(255,213,74,.35)}
   #ammoBar button.on .anm{color:#ffd54a;font-weight:bold}
   #ammoBar button:disabled{opacity:.3;cursor:default;filter:grayscale(1)}
-  .aicon{display:block;flex:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+  .aicon{display:block;flex:none;overflow:visible;filter:drop-shadow(0 0 2px rgba(80,255,120,.35))}   /* 磷光微光，不用黑色陰影 */
   .item .ico{flex:none;width:60px;height:34px;display:flex;align-items:center;justify-content:center;
        background:radial-gradient(circle,rgba(125,255,106,.1),transparent 70%);border:1px solid rgba(125,255,106,.15);border-radius:6px}
   .item .txt{flex:1;min-width:0}
@@ -223,10 +230,8 @@
        align-items:flex-start}
   #ammoList .item > div:last-child,#gearList .item > div:last-child{display:flex;flex-direction:column;gap:4px;align-items:flex-end}
   @media (max-width:640px){ #ammoList,#gearList{grid-template-columns:1fr} }
-  #jobList{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
+  #jobList{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
   #jobList .job{margin:0;display:flex;flex-direction:column}
-  #jobList .job button{margin-top:auto !important;align-self:flex-start}
-  #jobList .job .meta:last-of-type{margin-bottom:8px}
   .alert{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;
        padding:12px 14px;border:2px solid var(--warn);border-radius:6px;background:rgba(120,0,0,.45);color:#fff;
        font-size:16px;font-weight:bold;animation:alertPulse 1.6s ease-in-out infinite}
@@ -234,27 +239,84 @@
   #overlay .alert button{margin:0;background:var(--warn);color:#fff}
   @keyframes alertPulse{50%{box-shadow:0 0 18px rgba(255,82,82,.7)}}
   @media (max-width:640px){ #jobList{grid-template-columns:1fr} }
-  #overlay .box.term{max-width:960px;max-height:calc(100vh - 32px);overflow:auto;box-sizing:border-box;
-       box-shadow:0 0 30px rgba(125,255,106,.12),inset 0 0 60px rgba(0,0,0,.6)}
-  .termhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;font-size:13px;border-bottom:1px solid rgba(125,255,106,.25);padding-bottom:8px}
-  .termhead .stats b{color:var(--accent)}
-  .brand{color:#ff4d6d;letter-spacing:2px}
+  /* ---------- 暗網終端（A 磷光終端風格）：Tor 連線、加密訊息、CRT 掃描線與雜訊 ---------- */
+  #overlay{--dn-ink:#a8ffb9;--dn-hi:#d8ffe0;--dn-mute:#79b585;--dn-line:rgba(80,255,120,.2);--dn-glow:rgba(80,255,120,.55);--dn-amber:#ffb84d}
+  #overlay:not(.endMode)::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.06;
+       background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+       animation:dnNoise .5s steps(4) infinite}
+  @keyframes dnNoise{0%{background-position:0 0}25%{background-position:-40px 30px}50%{background-position:50px -20px}75%{background-position:-20px -50px}}
+  #overlay .box.term{position:relative;max-width:1100px;max-height:calc(100vh - 32px);overflow:auto;box-sizing:border-box;font-size:15px;
+       background:rgba(6,14,9,.95);border:1px solid var(--dn-line);border-radius:4px;
+       box-shadow:0 0 0 1px rgba(0,0,0,.6),0 0 40px rgba(0,0,0,.8),inset 0 0 60px rgba(0,0,0,.6)}
+  #startBox{background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px);animation:dnFlicker 7s infinite}
+  @keyframes dnFlicker{0%,96%,100%{filter:none}97%{filter:brightness(.8)}98%{filter:none}99%{filter:brightness(.9)}}
+  .termhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;font-size:14px;border-bottom:1px solid var(--dn-line);padding-bottom:10px}
+  .termhead .stats{color:var(--dn-mute)} .termhead .stats b{color:var(--dn-ink);font-weight:normal}
+  .termhead .addr{color:var(--dn-mute)} .termhead .addr b{color:var(--dn-ink);font-weight:normal}
+  .live{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--dn-ink);box-shadow:0 0 6px var(--dn-ink);margin-right:6px;animation:bl 1.4s infinite}
+  .brand{color:var(--dn-hi);letter-spacing:3px;font-weight:bold;text-shadow:0 0 6px var(--dn-glow)}
+  .glitch{position:relative;display:inline-block}
+  .glitch::before,.glitch::after{content:attr(data-t);position:absolute;left:0;top:0;opacity:.7}
+  .glitch::before{color:#ff2a6d;transform:translate(-1px,0);animation:dnG1 3.2s infinite steps(1)}
+  .glitch::after{color:#05d9e8;transform:translate(1px,0);animation:dnG2 2.7s infinite steps(1)}
+  @keyframes dnG1{0%,90%,100%{clip-path:inset(100% 0 0 0)}91%{clip-path:inset(10% 0 60% 0)}93%{clip-path:inset(55% 0 20% 0)}95%{clip-path:inset(30% 0 40% 0)}}
+  @keyframes dnG2{0%,88%,100%{clip-path:inset(100% 0 0 0)}89%{clip-path:inset(60% 0 10% 0)}92%{clip-path:inset(20% 0 65% 0)}}
   .blink{color:#ff4d6d;animation:bl 1.2s steps(2) infinite}
   @keyframes bl{50%{opacity:0}}
-  .tabs{display:flex;gap:6px;margin:10px 0}
-  #overlay .tab{margin:0;background:#132016;color:var(--fg);font-weight:normal}
-  #overlay .tab.on{background:var(--accent);color:#031;font-weight:bold}
-  #overlay button.small{margin:0;padding:4px 10px;font-size:13px;background:#132016;color:var(--fg)}
+  .tabs{display:flex;gap:2px;margin:0 0 12px;border-bottom:1px solid var(--dn-line)}
+  #overlay .tab{margin:0;padding:10px 16px;font-size:16px;background:transparent;border:0;border-bottom:2px solid transparent;border-radius:0;
+       color:var(--dn-mute);font-weight:normal;letter-spacing:1px}
+  #overlay .tab:hover{color:var(--dn-ink)}
+  /* 分頁與刷新按鈕的文字不換行；手機上分頁縮小內距，放不下就橫向捲動 */
+  #overlay .tab,#overlay button.small{white-space:nowrap;flex:none}
+  .tabs{overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .row{flex-wrap:wrap}
+  @media (max-width:640px){
+    #overlay .tab{padding:9px 10px;font-size:15px;letter-spacing:0}
+  }
+  #overlay .tab.on{background:transparent;color:var(--dn-hi);border-bottom-color:var(--dn-ink);font-weight:normal;text-shadow:0 0 6px var(--dn-glow)}
+  #overlay button.small{margin:0;padding:5px 12px;font-size:14px;background:transparent;color:var(--dn-ink);border:1px solid var(--dn-ink);border-radius:3px;font-weight:normal;letter-spacing:.5px}
+  #overlay button.small:not(:disabled):hover{background:var(--dn-ink);color:#020403;box-shadow:0 0 12px var(--dn-glow)}
   #overlay button:disabled{opacity:.4;cursor:not-allowed}
-  .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}
-  .job{border:1px solid rgba(125,255,106,.25);border-radius:6px;padding:10px 12px;margin-bottom:10px;background:rgba(20,32,23,.6)}
-  .job .top{display:flex;justify-content:space-between;gap:8px;font-size:13px;opacity:.85}
-  .job .msg{margin:6px 0;font-size:14px;color:#f2f2f2}
-  .job .meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;align-items:center}
-  .job .meta b{color:var(--accent)}
-  .job .pay{color:#ffd54a;font-weight:bold}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;font-size:14px;color:var(--dn-mute)}
+  /* 委託卡：加密檔案 */
+  .job{position:relative;border:1px solid var(--dn-line);border-radius:3px;padding:14px 16px 12px;margin-bottom:10px;background:rgba(0,0,0,.35);overflow:hidden;
+       transition:border-color .2s, box-shadow .2s}
+  .job:hover{border-color:var(--dn-ink);box-shadow:0 0 18px rgba(0,0,0,.6),0 0 10px var(--dn-glow) inset}
+  .job::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--sev)}
+  .job .jtop{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--dn-mute);letter-spacing:.5px}
+  .job .jid{font-size:11px;opacity:.7;letter-spacing:.5px}
+  .job .stars{color:var(--dn-amber);letter-spacing:2px;font-size:15px}
+  .job .from{margin:8px 0 2px;font-size:15px;color:var(--dn-ink)}
+  .redact{background:var(--dn-ink);color:transparent;border-radius:1px;padding:0 2px;user-select:none;transition:background .3s,color .3s}
+  .job:hover .redact{background:transparent;color:var(--dn-hi)}
+  .job .sev{font-size:13px;padding:0 6px;border:1px solid var(--sev);color:var(--sev);border-radius:2px;margin-left:6px}
+  .job .msg{margin:8px 0;padding:8px 10px;border-left:2px solid var(--dn-line);background:rgba(255,255,255,.02);color:var(--dn-hi);min-height:84px;font-size:16px;line-height:1.8}
+  .job .msg .enc{color:var(--dn-mute);word-break:break-all}
+  .job .meta{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:15px;align-items:center;color:var(--dn-mute)}
+  .job .meta b{color:var(--dn-ink);font-weight:normal}
+  .job .meta b.req{color:#ff5c7a}
+  .job .sub{font-size:13px}
+  .job .jfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;padding-top:10px}
+  .job .pay{color:var(--dn-amber);font-size:16px;font-weight:normal}
+  .job .sig{font-size:11px;color:var(--dn-mute);opacity:.7;margin-top:6px;word-break:break-all}
+  .job .stamp{position:absolute;right:12px;top:36px;transform:rotate(-12deg);font-size:14px;font-weight:bold;letter-spacing:2px;padding:1px 6px;
+       border:2px solid #ff3b5c;color:#ff3b5c;opacity:.55;pointer-events:none}
   .job .ped{position:relative;display:inline-block;margin:0;--s:22px;vertical-align:middle}
-  .job button{margin-top:8px !important}
+  #overlay .job .jfoot button{margin:0;padding:6px 14px;font-size:14px;background:transparent;color:var(--dn-ink);border:1px solid var(--dn-ink);border-radius:3px;font-weight:normal;letter-spacing:1px}
+  #overlay .job .jfoot button:not(:disabled):hover{background:var(--dn-ink);color:#020403;box-shadow:0 0 12px var(--dn-glow)}
+  /* 未解密的委託不顯示情報區塊，只留「解密情報」按鈕；解密後情報淡入 */
+  .job .intel.reveal{animation:intelIn .5s ease-out}
+  @keyframes intelIn{from{opacity:0;filter:blur(4px)}to{opacity:1;filter:none}}
+  .dnfoot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--dn-line);font-size:13px;color:var(--dn-mute)}
+  .dnfoot b{color:var(--dn-ink);font-weight:normal}
+  /* 連線開機畫面（每次開啟網頁播一次，點一下可跳過） */
+  #dnBoot{position:absolute;inset:0;z-index:5;background:#020403;padding:60px 8vw;white-space:pre-wrap;color:var(--dn-mute);font-size:16px;line-height:1.7;
+       transition:opacity .5s;cursor:pointer;overflow:hidden}
+  #dnBoot .ok{color:var(--dn-ink)} #dnBoot .hi{color:var(--dn-hi);text-shadow:0 0 8px var(--dn-glow)}
+  #dnBoot.done{opacity:0;pointer-events:none}
+  #dnBoot .skip{position:absolute;right:16px;bottom:14px;font-size:13px;opacity:.6}
   .item{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px dashed rgba(125,255,106,.18);padding:9px 0;font-size:13px}
   .item .nm{font-size:14px;color:#fff}
   .item .lv{color:var(--accent)}
@@ -338,7 +400,7 @@
   <!-- 暗網終端 -->
   <div class="box term" id="startBox">
     <div class="termhead">
-      <div><span class="blink">●</span> DARKNET://nmk.onion　<b class="brand">噁男殺手</b> <span style="opacity:.6">ver 0.3</span></div>
+      <div><span class="live"></span><span class="addr">tor://<b id="dnOnion">nmk….onion</b></span>　<b class="brand glitch" data-t="噁男殺手">噁男殺手</b> <span style="opacity:.6">ver 0.3</span></div>
       <div class="stats">資金 <b id="sMoney">-</b>｜子彈 <b id="sAmmo">-</b>｜聲望 <b id="sRep">-</b>｜完成 <b id="sDone">-</b></div>
     </div>
     <div class="tabs">
@@ -349,7 +411,7 @@
     </div>
     <div class="tabpane" id="tab-jobs">
       <div id="jobAlert"></div>
-      <div class="row"><span style="opacity:.7">收到的求助委託（台北市）</span><button class="small" id="refreshJobs">刷新委託（$50）</button></div>
+      <div class="row" style="justify-content:flex-end"><button class="small" id="refreshJobs">刷新委託（$50）</button></div>
       <div id="jobList"></div>
     </div>
     <div class="tabpane hidden" id="tab-ammo">
@@ -396,6 +458,7 @@
       <ul>
         <li>完美達成委託 +5～15，失敗 -3，每誤傷一個路人 -10。聲望可以是負的</li>
         <li><b>小費</b>：完成委託時額外拿到 聲望 × 10（聲望是負的就沒有小費）</li>
+        <li><b>解密情報</b>：委託的出沒地點、噁男特徵和現場狀況（時限、人潮、風速）是加密的，付 $5 解密後才看得到、才能接案</li>
         <li><b>學生委託</b>：國小、國高中、大學生、研究生沒什麼錢，酬勞很少，也沒有小費和時間獎金；有些甚至是<b>免費委託</b>，但完成後聲望加 3 倍</li>
         <li><b>售價</b>：彈藥與裝備升級都減去 聲望 × 10；聲望是負的就會變貴。最低是原價的 10%</li>
         <li>聲望越高，越常收到高難度、高酬勞的 ★★★ 委託</li>
@@ -421,6 +484,8 @@
       <div id="progTxt" style="margin-top:6px;font-size:12px;opacity:.85"></div>
     </div>
     <div id="loadMsg" style="margin-top:6px;font-size:13px;color:var(--warn)"></div>
+    <div class="dnfoot"><span>連線經由 <b>3</b> 個中繼節點：<b id="dnHops">DE → NL → IS</b>｜你的位置已隱藏</span><span>延遲 <b id="dnPing">--</b> ms｜PGP 驗證 ✔</span></div>
+    <div id="dnBoot" class="hidden"></div>
   </div>
   <!-- 任務結算 -->
   <div class="box term hidden" id="endBox">
@@ -431,7 +496,7 @@
   </div>
 </div>
 
-<script src="data/incidents.js"></script>
+<script src="data/incidents.js?v=0.3.5"></script>
 <script src="js/audio.js?v=0.3.4"></script>   <!-- 改 audio.js 時一併改版本號，避免瀏覽器用到舊的快取 -->
 <script>
 (() => {
@@ -561,7 +626,7 @@ const AMMO_TYPES = {
   prec:  {nm:'競賽級精準彈', price:550, v:1, wind:1,    spread:0.25, tol:0,    panic:1,    ds:'手工裝填，隨機散布只剩 25%，適合打手掌、膝蓋這種小部位。'},
   hp:    {nm:'擴張彈',   price:500,  v:0.95, wind:1.1,  spread:1,    tol:0.06, panic:1,    ds:'命中後彈頭擴張，命中判定範圍變大；稍微慢一點、比較吃風。'},
   sub:   {nm:'亞音速彈', price:400,  v:0.65, wind:1.4,  spread:1,    tol:0,    panic:0.2,  ds:'幾乎沒有槍聲，旁人不會受驚；但飛得很慢、很吃風。'},
-  tranq: {nm:'麻醉彈',   price:350,  v:0.75, wind:1.2,  spread:1.2,  tol:0,    panic:0.5,  nonlethal:true, ds:'打中任何部位都不致命，噁男會倒地不動。打頭也不會死，適合先固定目標、照順序慢慢來。'},
+  tranq: {nm:'麻醉彈',   price:350,  v:0.75, wind:1.2,  spread:1.2,  tol:0,    panic:0.5,  nonlethal:true, ds:'打中任何部位都不致命，噁男會倒地，只能慢慢爬。打頭也不會死，適合先固定目標、照順序慢慢來。'},
   frag:  {nm:'破片彈',   price:700,  v:0.9,  wind:1,    spread:1,    tol:0.15, panic:1.6,  allLethal:true, splash:2, ds:'命中範圍很大，但打中任何部位都致命；2 m 內的路人會被波及。'},
   guided:{nm:'導引彈',   price:2500, v:1,    wind:0,    spread:1,    tol:0,    panic:1,    guided:1, ds:'彈頭會自動修正：完全不受風影響，並追蹤準星附近的人，補上全部的移動提前量（一般子彈只補 60%）。'},
 };
@@ -569,34 +634,38 @@ const AMMO_KEYS = Object.keys(AMMO_TYPES);
 
 /* ---------- 彈藥圖示 ----------
    側視的子彈：彈殼（黃銅）＋彈頭（顏色依種類）＋代表特性的標記。viewBox 48×24。 */
+/* 子彈圖示：配合暗網終端的磷光線稿風格——綠色細線勾輪廓、半透明填色、沒有黑框；
+   只有彈頭用各子彈的代表色（發光），再加上代表特性的小記號（同一個顏色） */
+const AMMO_INK = '#a8ffb9';
 const AMMO_LOOK = {
-  std:   {tip:'#b8653a', mark:''},
-  hv:    {tip:'#2f7dff', mark:'<g stroke="#7fb4ff" stroke-width="1.6" stroke-linecap="round"><line x1="1" y1="4" x2="8" y2="4"/><line x1="0" y1="20" x2="7" y2="20"/><line x1="3" y1="12" x2="0" y2="12"/></g>'},
-  match: {tip:'#2e9e44', mark:'<path d="M4 3.5 Q14 0.5 22 3.5 T40 3.5" fill="none" stroke="#9be7a8" stroke-width="1.5" stroke-linecap="round"/><path d="M8 21 Q18 23.5 26 21" fill="none" stroke="#9be7a8" stroke-width="1.3" stroke-linecap="round"/>'},
-  prec:  {tip:'#f2f2f2', mark:'<g fill="none" stroke="#ff3b3b" stroke-width="1.3"><circle cx="15" cy="12" r="3.6"/><line x1="15" y1="6" x2="15" y2="8.5"/><line x1="15" y1="15.5" x2="15" y2="18"/><line x1="9" y1="12" x2="11.5" y2="12"/><line x1="18.5" y1="12" x2="21" y2="12"/></g>'},
-  hp:    {tip:'#ff8a1f', mark:'<path d="M42.5 9.6 L46.5 12 L42.5 14.4 Z" fill="#3a1a00"/><g stroke="#ffb066" stroke-width="1.2" stroke-linecap="round"><line x1="46" y1="5" x2="47.5" y2="2.5"/><line x1="46" y1="19" x2="47.5" y2="21.5"/></g>'},
-  sub:   {tip:'#8e5bd6', mark:'<g fill="none" stroke="#c9a8ff" stroke-width="1.3" stroke-linecap="round"><path d="M9 4 Q11 2.5 13 4"/><path d="M8 2 Q11 -0.5 14 2"/></g><line x1="6" y1="0.8" x2="16" y2="5.6" stroke="#ff5252" stroke-width="1.4" stroke-linecap="round"/>'},
-  frag:  {tip:'#e53935', mark:'<path d="M15 4.5 L16.6 9 L21 7.6 L18.2 11.4 L22 14 L17.2 14 L17.6 19 L15 15.4 L12.4 19 L12.8 14 L8 14 L11.8 11.4 L9 7.6 L13.4 9 Z" fill="#ffd54a" stroke="#7a1b00" stroke-width=".8"/>'},
-  guided:{tip:'#ffd400', mark:'<g fill="none" stroke="#ffe866" stroke-width="1.3" stroke-linecap="round"><path d="M40 4 Q43 2 46 4"/><path d="M38.5 1.8 Q43 -1 47.5 1.8"/></g><circle cx="15" cy="12" r="2" fill="#ff3bd4"/>'},
+  std:   {tip:'#e08a4f', mark:c=>''},
+  hv:    {tip:'#4da3ff', mark:c=>`<g stroke="${c}" stroke-width="1.4" stroke-linecap="round"><line x1="0.5" y1="4" x2="7" y2="4"/><line x1="0" y1="20" x2="6" y2="20"/><line x1="1.5" y1="12" x2="-1" y2="12"/></g>`},
+  match: {tip:'#5fdc78', mark:c=>`<path d="M5 3.5 Q14 1 22 3.5 T39 3.5" fill="none" stroke="${c}" stroke-width="1.2" stroke-linecap="round"/><path d="M8 20.8 Q17 23 25 20.8" fill="none" stroke="${c}" stroke-width="1.1" stroke-linecap="round"/>`},
+  prec:  {tip:'#ffffff', mark:c=>`<g fill="none" stroke="#ff5c7a" stroke-width="1.1"><circle cx="15" cy="12" r="3.2"/><line x1="15" y1="6.8" x2="15" y2="8.6"/><line x1="15" y1="15.4" x2="15" y2="17.2"/><line x1="9.8" y1="12" x2="11.6" y2="12"/><line x1="18.4" y1="12" x2="20.2" y2="12"/></g>`},
+  hp:    {tip:'#ff9a3c', mark:c=>`<path d="M43 10 L46.2 12 L43 14 Z" fill="#020403" opacity=".75"/><g stroke="${c}" stroke-width="1.1" stroke-linecap="round"><line x1="46" y1="6" x2="47.6" y2="3.4"/><line x1="46" y1="18" x2="47.6" y2="20.6"/></g>`},
+  sub:   {tip:'#b48cff', mark:c=>`<g fill="none" stroke="${c}" stroke-width="1.2" stroke-linecap="round"><path d="M9 4.2 Q11 2.8 13 4.2"/><path d="M8 2.2 Q11 -0.2 14 2.2"/></g><line x1="6.5" y1="1" x2="15.5" y2="5.4" stroke="#ff5c7a" stroke-width="1.2" stroke-linecap="round"/>`},
+  frag:  {tip:'#ff4d4d', mark:c=>`<path d="M15 5 L16.4 9.2 L20.4 8 L17.9 11.4 L21.3 13.8 L17 13.8 L17.4 18.2 L15 15 L12.6 18.2 L13 13.8 L8.7 13.8 L12.1 11.4 L9.6 8 L13.6 9.2 Z" fill="#ffd84a" opacity=".9"/>`},
+  guided:{tip:'#ffd84a', mark:c=>`<g fill="none" stroke="${c}" stroke-width="1.2" stroke-linecap="round"><path d="M40 4.2 Q43 2.4 46 4.2"/><path d="M38.6 2 Q43 -0.8 47.4 2"/></g><circle cx="15" cy="12" r="1.8" fill="#ff5cd6"/>`},
 };
 function ammoIcon(k, w=44){
-  const h = w/2;
+  const h = w/2, ink = AMMO_INK;
   if(k==='tranq'){   // 麻醉彈畫成麻醉鏢
+    const c='#ff6fbf';
     return `<svg class="aicon" width="${w}" height="${h}" viewBox="0 0 48 24" aria-hidden="true">
-      <path d="M2 6 L11 10 L11 14 L2 18 L5 12 Z" fill="#ff5cad" stroke="#7a1d4f" stroke-width=".8"/>
-      <rect x="10" y="8.5" width="24" height="7" rx="2" fill="#dfe8ea" stroke="#5c6b70" stroke-width=".9"/>
-      <rect x="14" y="9.8" width="13" height="4.4" rx="1" fill="#2ad4ff"/>
-      <rect x="33" y="10" width="4" height="4" fill="#9aa6aa"/>
-      <line x1="37" y1="12" x2="47" y2="12" stroke="#cfd8db" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+      <path d="M2 6.5 L11 10 L11 14 L2 17.5 L5 12 Z" fill="${c}" opacity=".85"/>
+      <rect x="10.5" y="8.5" width="23" height="7" rx="2" fill="rgba(168,255,185,.08)" stroke="${ink}" stroke-width="1"/>
+      <rect x="14" y="10" width="12" height="4" rx="1" fill="#2ad4ff" opacity=".85"/>
+      <rect x="33.5" y="10.2" width="3.5" height="3.6" fill="none" stroke="${ink}" stroke-width=".9"/>
+      <line x1="37" y1="12" x2="46.5" y2="12" stroke="${ink}" stroke-width="1.3" stroke-linecap="round"/></svg>`;
   }
   const L = AMMO_LOOK[k] || AMMO_LOOK.std;
   return `<svg class="aicon" width="${w}" height="${h}" viewBox="0 0 48 24" aria-hidden="true">
-    <rect x="2" y="6" width="3.2" height="12" rx=".8" fill="#8a6a2a"/>
-    <rect x="4.5" y="7" width="22" height="10" rx="1.4" fill="#c9a24a" stroke="#6b5020" stroke-width=".8"/>
-    <rect x="5.5" y="8.2" width="20" height="2" rx="1" fill="#f0d68a" opacity=".7"/>
-    <path d="M26.5 7.3 L33 7.3 Q43 8.6 46.5 12 Q43 15.4 33 16.7 L26.5 16.7 Z" fill="#b8653a" stroke="#5a2d14" stroke-width=".8"/>
-    <path d="M37 7.9 Q43.5 9.2 46.5 12 Q43.5 14.8 37 16.1 Z" fill="${L.tip}" stroke="#222" stroke-width=".6"/>
-    ${L.mark}</svg>`;
+    <rect x="2.2" y="6.6" width="2.8" height="10.8" rx=".6" fill="none" stroke="${ink}" stroke-width="1"/>
+    <rect x="5" y="7.2" width="21.5" height="9.6" rx="1.2" fill="rgba(168,255,185,.08)" stroke="${ink}" stroke-width="1"/>
+    <line x1="8" y1="9.3" x2="23.5" y2="9.3" stroke="${ink}" stroke-width=".6" opacity=".45"/>
+    <path d="M26.5 7.6 L33 7.6 Q42.5 8.8 46 12 Q42.5 15.2 33 16.4 L26.5 16.4 Z" fill="rgba(168,255,185,.05)" stroke="${ink}" stroke-width="1"/>
+    <path d="M37.2 8.6 Q43 9.6 46 12 Q43 14.4 37.2 15.4 Z" fill="${L.tip}"/>
+    ${L.mark(L.tip)}</svg>`;
 }
 
 /* ---------- 裝備 ----------
@@ -628,7 +697,7 @@ const U = k => UPGRADES[k].vals[save.up[k]];
 const priceOf = base => Math.max(Math.ceil(base*0.1), base - save.rep*10);
 const tipOf = () => Math.max(0, save.rep*10);
 const ammoTotal = () => AMMO_KEYS.reduce((s,k)=>s+(save.ammo[k]||0), 0);
-const money = n => 'NT$ ' + Math.round(n).toLocaleString('en-US');
+const money = n => '$' + Math.round(n).toLocaleString('en-US');
 
 /* ---------- 委託產生器 ---------- */
 // 委託人：minor = 國高中生（只搭配標記 m 的非露骨描述）；kid = 國小生（只搭配標記 k、用小孩口吻寫的非露骨描述）。
@@ -703,6 +772,8 @@ const SEV_BONUS = [0, 0, 500, 1200];   // 情節越重，委託人湊得越多
    回傳 {key, t, lv}。key 用來避免短時間內重複；同一個「行為」最近出現過也會避開。 */
 const TX = window.NMK_TEXT || null;
 let recentInc = [];
+// 和這件事說得通的後續：後續的 n（需要的性質）空白，或和行為的 k 至少有一個字相同
+const afterFor = a => TX.after[a.who].filter(f => !f.n || [...f.n].some(ch => (a.k||'').includes(ch)));
 function pickIncident(cl){
   const who = cl.kid ? 'k' : cl.minor ? 'm' : 'a';
   const recent = new Set([...recentInc, ...jobs.map(j=>j.inc)]);
@@ -716,11 +787,11 @@ function pickIncident(cl){
       const cat = a.pl.length ? pick(a.pl) : null;
       const places = cat ? TX.places[cat] : [''];
       const pi = Math.floor(Math.random()*places.length);
-      const afters = who==='a' ? TX.after.a.concat(cat==='work' ? TX.after.work : []) : TX.after[who];
+      const afters = afterFor(a);
       const fi = Math.floor(Math.random()*afters.length);
       const key = `g${ai}|${cat}|${pi}|${fi}`;
       if(recent.has(key)) continue;
-      res = {key, lv:a.lv, t: a.t.replace('{p}', places[pi]) + '。' + afters[fi]};
+      res = {key, lv:a.lv, t: a.t.replace('{p}', places[pi]) + '。' + afters[fi].t};
     }
   }
   if(!res){   // 手寫描述：國小生只用 k；國高中生只用 m；成年人用 k 以外的全部
@@ -738,9 +809,9 @@ function incidentCount(){
   const c = {a:0, m:0, k:0};
   for(const x of INCIDENTS) c[x.k?'k':'a']++, x.m && c.m++;
   if(TX) for(const a of TX.acts){
-    const afterN = a.who==='a' ? TX.after.a.length : TX.after[a.who].length;
+    const afterN = afterFor(a).length;
     if(!a.pl.length) c[a.who] += afterN;
-    else for(const cat of a.pl) c[a.who] += TX.places[cat].length * (afterN + (a.who==='a' && cat==='work' ? TX.after.work.length : 0));
+    else for(const cat of a.pl) c[a.who] += TX.places[cat].length * afterN;
   }
   return c;
 }
@@ -789,6 +860,8 @@ function makeJob(){
   const cl = pick(CLIENTS), I = pickIncident(cl), inc = I.key, lv = I.lv;
   return {
     id: Math.random().toString(36).slice(2,8),
+    at: Date.now() - Math.floor(rand(5, 480))*60000,   // 收到時間（幾分鐘到 8 小時前）
+    sig: hexStr(18),                                    // 假的 PGP 簽章（只是氣氛）
     client: cl.n, inc, msg: I.t, sev: lv, district: pick(keys), stars,
     o: randOutfit(true),
     body: randBody(),
@@ -808,7 +881,7 @@ function studentPay(cl, pay){
   return {pay: Math.max(100, Math.round(pay*k/100)*100), stu:true, free:false};
 }
 const payLabel = j => j.free ? '免費委託（聲望 ×3）' : j.stu ? `酬勞 ${money(j.pay)}（學生）` : `酬勞 ${money(j.pay)}`;
-const JOB_COUNT = 6;
+const JOB_COUNT = 4;
 const REFRESH_COST = 50;   // 刷新委託的費用
 function refreshJobs(){ jobs = []; for(let i=0;i<JOB_COUNT;i++) jobs.push(makeJob()); }
 const SHIRTS = [
@@ -850,6 +923,8 @@ function outfitFig(o, body, m){
   const svg = FIG_SVG.replace('__SX__', (BODY_SCALE*B.sx).toFixed(3)).replace('__SY__', (BODY_SCALE*H.sy*A.sy).toFixed(3));
   return `<span class="pvfig" style="--m:${m}"><span class="pw${o.hat!==HATS[0]?'':' nohat'}" style="${outfitVars(o)}">${svg}</span></span>`;
 }
+// 給開發樣品頁（_samples/）借用同一套人形畫法
+window.NMK_FIG = { outfitFig, randBody:()=>randBody(), HATS, SHIRTS, HAIRS };
 
 /* ---------- 工具 ---------- */
 const $ = id => document.getElementById(id);
@@ -1636,6 +1711,43 @@ function renderStats(){
   $('sRep').style.color   = save.rep<0 ? 'var(--warn)' : '';
   $('sDone').textContent  = save.done + ' 件';
 }
+/* ---------- 暗網氣氛：亂碼解密、連線開機畫面、洋蔥位址、延遲 ---------- */
+const seenJobs = new Set();
+const UNLOCK_COST = 5;      // 解密一件委託的情報（出沒、特徵、現場狀況）要付的錢
+let justUnlocked = null;
+const hexStr = n => Array.from({length:n}, ()=>Math.floor(Math.random()*256).toString(16).padStart(2,'0')).join('');
+const GLYPH = '▓▒░█▌▐#$%&@0123456789abcdef';
+const scrambleText = t => [...t].map(c=>/[\s，。、「」！？]/.test(c) ? c : GLYPH[Math.floor(Math.random()*GLYPH.length)]).join('');
+function decryptText(el, plain){
+  let k = 0;
+  const id = setInterval(()=>{
+    if(!el.isConnected){ clearInterval(id); return; }
+    k += 2; el.textContent = plain.slice(0,k) + scrambleText(plain.slice(k));
+    if(k >= plain.length){ clearInterval(id); el.textContent = plain; el.classList.remove('enc'); }
+  }, 26);
+}
+const DN_BOOT = [
+  ['> 啟動 tor 用戶端 …', 220], ['', 40],
+  ['  建立電路：選擇入口節點 ……… <span class="ok">[OK]</span>', 320],
+  ['  中繼節點 1/3：DE ……… <span class="ok">[OK]</span>', 200],
+  ['  中繼節點 2/3：NL ……… <span class="ok">[OK]</span>', 200],
+  ['  中繼節點 3/3：IS ……… <span class="ok">[OK]</span>', 200],
+  ['  驗證隱藏服務憑證 ……… <span class="ok">[OK]</span>', 280],
+  ['  交換金鑰 ECDH-X25519 ……… <span class="ok">[OK]</span>', 240], ['', 40],
+  ['<span class="hi">> 連線成功。歡迎回來。</span>', 380],
+  ['<span class="hi">> 法律管不了的，交給你。</span>', 600],
+];
+function dnBoot(){
+  const el = $('dnBoot'); el.classList.remove('hidden','done'); el.innerHTML = '<span class="skip">點一下跳過 ▸</span>';
+  let i = 0, timer = 0;
+  const finish = () => { clearTimeout(timer); el.classList.add('done'); setTimeout(()=>el.classList.add('hidden'), 500); };
+  el.onclick = finish;
+  const next = () => {
+    if(i >= DN_BOOT.length){ timer = setTimeout(finish, 400); return; }
+    el.insertAdjacentHTML('beforeend', DN_BOOT[i][0] + '\n'); timer = setTimeout(next, DN_BOOT[i][1]); i++;
+  };
+  next();
+}
 function renderJobs(){
   // 防卡關：沒子彈也沒錢買時，黑市賒 3 發
   let alert = '';
@@ -1643,21 +1755,34 @@ function renderJobs(){
   if(ammoTotal()<=0) alert = '<div class="alert">⚠ 沒有子彈了！先到「彈藥庫」購買彈藥才能接案。<button data-tab="ammo">前往彈藥庫</button></div>';
   $('jobAlert').innerHTML = alert;
   const canGo = ammoTotal()>0 && !loading;
+  const fresh = [];
   $('jobList').innerHTML = jobs.map(j=>{
-    const D=DIFF[j.stars];
-    return `<div class="job">
-      <div class="top"><span>來自：${j.client}　<span style="color:${['','#9fd39a','#ffb74d','#ff4d6d'][j.sev]}">[${['','輕','中','重'][j.sev]}]</span></span><span style="color:#ffd54a">${'★'.repeat(j.stars)}${'☆'.repeat(3-j.stars)}</span></div>
-      <div class="msg">「${j.msg}」</div>
-      <div class="meta" style="margin-bottom:4px"><span>要求：<b style="color:#ff8fa3">${reqChain(j.req.steps)}</b></span></div>
-      <div class="meta">
-        <span>出沒：<b>台北市${DISTRICTS[j.district].name}</b></span>
-        <span class="feat">${outfitFig(j.o, j.body, 15)}<span>特徵：${outfitText(j.o)}</span></span>
-        <span>時限 ${mmss(D.time)}．人潮 ${D.peds}．風速最高 ${D.windMax} m/s</span>
-        <span class="pay">${payLabel(j)}</span>
-      </div>
-      <button data-job="${j.id}" ${canGo?'':'disabled'}>接案</button>
+    const D=DIFF[j.stars], sevC=['','#7dbf7d','#ffb84d','#ff3b5c'][j.sev];
+    const [nick, who] = j.client.includes('．') ? j.client.split('．') : ['', j.client];
+    const isNew = !seenJobs.has(j.id); if(isNew){ seenJobs.add(j.id); fresh.push(j.id); }
+    const at = new Date(j.at||Date.now()).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
+    return `<div class="job" style="--sev:${sevC}">
+      <div class="jtop"><span class="jid">#${j.id.toUpperCase()}｜${at}</span><span class="stars">${'★'.repeat(j.stars)}${'☆'.repeat(3-j.stars)}</span></div>
+      <div class="from">來自：${nick?`<span class="redact">${nick}</span>．`:''}${who}</div>
+      <div class="msg"><span class="${isNew?'enc':''}" data-id="${j.id}">${isNew ? scrambleText(j.msg) : j.msg}</span></div>
+      <div class="meta"><span>要求：<b class="req">${reqChain(j.req.steps)}</b></span></div>
+      ${j.unlocked ? `<div class="intel${j.id===justUnlocked?' reveal':''}">
+        <div class="meta" style="margin-top:4px">
+          <span>出沒：<b data-dec>台北市${DISTRICTS[j.district].name}</b></span>
+          <span class="feat">${outfitFig(j.o, j.body, 18)}<span>特徵：<b data-dec>${outfitText(j.o)}</b></span></span>
+        </div>
+        <div class="meta sub" style="margin-top:4px"><span data-dec>時限 ${mmss(D.time)}．人潮 ${D.peds}．風速最高 ${D.windMax} m/s</span></div>
+      </div>` : ''}
+      <div class="jfoot"><span class="pay">${payLabel(j)}</span>${j.unlocked
+        ? `<button data-job="${j.id}" ${canGo?'':'disabled'}>接案</button>`
+        : `<button data-unlock="${j.id}">解密情報（${money(UNLOCK_COST)}）</button>`}</div>
+      <div class="sig">-----PGP SIGNATURE----- ${j.sig||''}</div>
     </div>`;
   }).join('');
+  // 剛付費解密的委託：情報逐字解密
+  if(justUnlocked){ $('jobList').querySelectorAll('.intel.reveal [data-dec]').forEach((el,i)=>{ const t=el.textContent; el.textContent=scrambleText(t); setTimeout(()=>decryptText(el, t), 80+i*120); }); justUnlocked=null; }
+  // 新收到的委託：亂碼逐字解密成明文
+  fresh.forEach((id,i)=>{ const el=$('jobList').querySelector(`.msg span[data-id="${id}"]`), j=jobs.find(x=>x.id===id); if(el&&j) setTimeout(()=>decryptText(el, j.msg), 250+i*300); });
 }
 // 顯示聲望調整後的價格；有變動時把原價劃掉
 const priceTag = base => { const p=priceOf(base); return p===base ? money(p)
@@ -1749,7 +1874,10 @@ function spend(cost, btn, after){
 $('startBox').addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b || b.disabled) return;
   if(b.dataset.tab){ renderTerminal(); showTab(b.dataset.tab); }
-  else if(b.dataset.job){ const j=jobs.find(x=>x.id===b.dataset.job); if(j) openLoadout(j); }
+  else if(b.dataset.job){ const j=jobs.find(x=>x.id===b.dataset.job); if(j && j.unlocked) openLoadout(j); }
+  else if(b.dataset.unlock){ const j=jobs.find(x=>x.id===b.dataset.unlock); if(!j || j.unlocked) return;
+    if(save.money>=UNLOCK_COST) spend(UNLOCK_COST, b, ()=>{ j.unlocked=true; justUnlocked=j.id; renderTerminal(); });
+    else denyFx(b); }
   else if(b.dataset.buy){ const [k,n]=b.dataset.buy.split(':'), cost=priceOf(AMMO_TYPES[k].price)*(+n);
     if(save.money>=cost) spend(cost, b, ()=>{ save.ammo[k]=(save.ammo[k]||0)+(+n); persist(); renderTerminal(); });
     else denyFx(b); }
@@ -1760,9 +1888,12 @@ $('startBox').addEventListener('click', e=>{
     const c=priceOf(u.cost[lv]||0);
     if(lv<u.vals.length-1 && save.money>=c) spend(c, b, ()=>{ save.up[k]++; persist(); renderTerminal(); });
     else if(lv<u.vals.length-1) denyFx(b); }
-  else if(b.id==='refreshJobs'){   // 每次刷新扣 NT$ 50
+  else if(b.id==='refreshJobs'){   // 每次刷新扣 $50
     if(save.money<REFRESH_COST){ denyFx(b); showDialog({title:'錢不夠', msg:`刷新委託要 ${money(REFRESH_COST)}，你現在只有 ${money(save.money)}。`, ok:'知道了'}); return; }
-    spend(REFRESH_COST, b, ()=>{ refreshJobs(); renderTerminal(); }); }
+    spend(REFRESH_COST, b, ()=>{ refreshJobs(); renderTerminal();
+$('dnOnion').textContent = 'nmk' + hexStr(7).slice(0,13) + '…onion';
+setInterval(()=>{ if(!$('overlay').classList.contains('hidden')) $('dnPing').textContent = 380 + Math.floor(Math.random()*260); }, 1200);
+dnBoot(); }); }
   else if(b.id==='resetSave'){
     showDialog({title:'清除存檔？', msg:'資金、彈藥、裝備、聲望都會重置，而且無法復原。', ok:'清除存檔', cancel:'取消', danger:true})
       .then(yes=>{ if(yes){ save=NEW_SAVE(); persist(); refreshJobs(); renderTerminal(); showTab('jobs'); } });
@@ -1860,7 +1991,7 @@ function endGame(win, reason){
     const steps = job.req.steps, full = perfect();
     const ratio = payRatio();
     const base = Math.round(job.pay*ratio/100)*100;
-    const bonus = full && !job.stu ? Math.round(t*5/100)*100 : 0;   // 剩餘每秒 NT$5，只有完全達成才有（學生委託沒有）
+    const bonus = full && !job.stu ? Math.round(t*5/100)*100 : 0;   // 剩餘每秒 $5，只有完全達成才有（學生委託沒有）
     const cut = Math.round(base*Math.min(1, civKills*CIV_PAY_CUT));
     const tip = job.stu ? 0 : tipOf();   // 小費：依完成任務當下的聲望（學生付不起小費）
     gain = Math.max(0, base + bonus - cut) + tip;
