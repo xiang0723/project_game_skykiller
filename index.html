@@ -269,15 +269,15 @@
   @media (max-width:640px){ #jobList{grid-template-columns:1fr} }
   /* ---------- 暗網終端（A 磷光終端風格）：Tor 連線、加密訊息、CRT 掃描線與雜訊 ---------- */
   #overlay{--dn-ink:#a8ffb9;--dn-hi:#d8ffe0;--dn-mute:#79b585;--dn-line:rgba(80,255,120,.2);--dn-glow:rgba(80,255,120,.55);--dn-amber:#ffb84d}
-  #overlay:not(.endMode)::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.06;
-       background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-       animation:dnNoise .5s steps(4) infinite}
-  @keyframes dnNoise{0%{background-position:0 0}25%{background-position:-40px 30px}50%{background-position:50px -20px}75%{background-position:-20px -50px}}
+  /* 雜訊：每 90ms 重畫的灰階躁點，和掃描線＋暗角一起蓋在最上層（不閃爍、不擋點擊） */
+  #dnNoise{position:absolute;inset:0;z-index:4;width:100%;height:100%;pointer-events:none;opacity:.06;mix-blend-mode:screen}
+  #overlay.endMode #dnNoise{display:none}
+  #overlay:not(.endMode)::after{content:"";position:absolute;inset:0;z-index:5;pointer-events:none;
+       background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 1px,transparent 1px 3px),
+                  radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.85) 100%)}
   #overlay .box.term{position:relative;max-width:1100px;max-height:calc(100vh - 32px);overflow:auto;box-sizing:border-box;font-size:15px;
        background:rgba(6,14,9,.95);border:1px solid var(--dn-line);border-radius:4px;
        box-shadow:0 0 0 1px rgba(0,0,0,.6),0 0 40px rgba(0,0,0,.8),inset 0 0 60px rgba(0,0,0,.6)}
-  #startBox{background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px);animation:dnFlicker 7s infinite}
-  @keyframes dnFlicker{0%,96%,100%{filter:none}97%{filter:brightness(.8)}98%{filter:none}99%{filter:brightness(.9)}}
   .termhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;font-size:14px;border-bottom:1px solid var(--dn-line);padding-bottom:10px}
   .termhead .stats{color:var(--dn-mute)} .termhead .stats b{color:var(--dn-ink);font-weight:normal}
   .termhead .addr{color:var(--dn-mute)} .termhead .addr b{color:var(--dn-ink);font-weight:normal}
@@ -434,7 +434,7 @@
     <div class="mbtns"><button id="modalCancel" class="ghost"></button><button id="modalOk"></button></div>
   </div>
 </div>
-<div id="overlay">
+<div id="overlay"><canvas id="dnNoise"></canvas>
   <!-- 暗網終端 -->
   <div class="box term" id="startBox">
     <div class="termhead">
@@ -633,19 +633,38 @@ function partAtLocal(x,y,tolExtra=0){
   }
   return null;
 }
+/* 可以擺動的肢體：每組繞自己的關節（基準尺寸、y 朝前）轉 */
+const LIMBS = {
+  ll:{parts:['lfoot','lcalf','lthigh','lknee'], pv:[-0.12,-0.17]},   // 左腿：髖關節
+  rl:{parts:['rfoot','rcalf','rthigh','rknee'], pv:[ 0.12,-0.17]},
+  la:{parts:['lupper','lfore','lhand'],         pv:[-0.29, 0.24]},   // 左手：肩關節
+  ra:{parts:['rupper','rfore','rhand'],         pv:[ 0.29, 0.24]},
+  hd:{parts:['neck','head'],                    pv:[ 0.00, 0.28]},   // 頭：脖子根部
+};
+const LIMB_OF = {}; for(const k in LIMBS) for(const id of LIMBS[k].parts) LIMB_OF[id]=k;
 function figSVG(){
   const col = f => `var(--${f})`, Y = v => -v;   // SVG 的 y 軸向下
   let s = '';
+  const grp = {}; for(const k in LIMBS) grp[k]='';
+  const flush = k => { if(grp[k]===null) return; s += `<g class="lm" data-lm="${k}">${grp[k]}${k==='hd'?'__HAT__':''}</g>`; grp[k]=null; };
   for(const p of PARTS){
+    const k = LIMB_OF[p.id];
+    if(!k){ // 軀幹部位：畫之前先把排在它前面的肢體組畫出來（保持原本的前後順序）
+      if(p.id==='abdomen'){ flush('ll'); flush('rl'); }
+      if(p.id==='chest'){ flush('la'); flush('ra'); }
+    }
+    const out = k ? (x=>{ grp[k]+=x; }) : (x=>{ s+=x; });
     // 每個部位先畫一圈深色外框，部位之間的分界才看得清楚
-    if(p.type==='s') s += `<line x1="${p.a[0]}" y1="${Y(p.a[1])}" x2="${p.b[0]}" y2="${Y(p.b[1])}" stroke="rgba(0,0,0,.55)" stroke-width="${p.w+0.025}" stroke-linecap="round"/>`+
-                          `<line x1="${p.a[0]}" y1="${Y(p.a[1])}" x2="${p.b[0]}" y2="${Y(p.b[1])}" stroke="${col(p.fill)}" stroke-width="${p.w}" stroke-linecap="round"/>`;
-    else s += `<circle cx="${p.c[0]}" cy="${Y(p.c[1])}" r="${p.r}" fill="${col(p.fill)}" stroke="rgba(0,0,0,.55)" stroke-width=".0125"/>`;
+    if(p.type==='s') out(`<line x1="${p.a[0]}" y1="${Y(p.a[1])}" x2="${p.b[0]}" y2="${Y(p.b[1])}" stroke="rgba(0,0,0,.55)" stroke-width="${p.w+0.025}" stroke-linecap="round"/>`+
+                          `<line x1="${p.a[0]}" y1="${Y(p.a[1])}" x2="${p.b[0]}" y2="${Y(p.b[1])}" stroke="${col(p.fill)}" stroke-width="${p.w}" stroke-linecap="round"/>`);
+    else out(`<circle cx="${p.c[0]}" cy="${Y(p.c[1])}" r="${p.r}" fill="${col(p.fill)}" stroke="rgba(0,0,0,.55)" stroke-width=".0125"/>`);
   }
   // 帽子（比頭大一圈、黑色粗框，蓋住整顆頭）＋帽簷（標示面朝方向，分辨左右用）；沒戴帽的人只看到深色頭髮和鼻尖
-  s += `<g class="hatg"><ellipse cx="0" cy="${Y(0.70)}" rx="0.12" ry="0.065" fill="var(--hat)" stroke="#000" stroke-width=".022"/>`+
-       `<circle cx="0" cy="${Y(0.53)}" r="0.165" fill="var(--hat)" stroke="#000" stroke-width=".022"/></g>`;
-  s += `<circle class="nose" cx="0" cy="${Y(0.675)}" r="0.03" fill="var(--skin)" stroke="rgba(0,0,0,.5)" stroke-width=".01"/>`;
+  const hat = `<g class="hatg"><ellipse cx="0" cy="${Y(0.70)}" rx="0.12" ry="0.065" fill="var(--hat)" stroke="#000" stroke-width=".022"/>`+
+       `<circle cx="0" cy="${Y(0.53)}" r="0.165" fill="var(--hat)" stroke="#000" stroke-width=".022"/></g>`+
+       `<circle class="nose" cx="0" cy="${Y(0.675)}" r="0.03" fill="var(--skin)" stroke="rgba(0,0,0,.5)" stroke-width=".01"/>`;
+  for(const k in LIMBS) flush(k);   // 頭（含帽子、鼻子）最後畫
+  s = s.replace('__HAT__', hat);
   s += `<g class="xmark"><line x1="-.3" y1="-.4" x2=".3" y2=".2"/><line x1=".3" y1="-.4" x2="-.3" y2=".2"/></g>`;
   return `<svg class="fig" viewBox="-1.1 -1.3 2.2 2.6"><g class="body" transform="scale(__SX__,__SY__)">${s}</g></svg>`;
 }
@@ -1448,7 +1467,7 @@ function setEdge(p, a, b){
   p.a=a; p.b=b; p.len=Math.max(meters(a.ll,b.ll),0.01); p.t=0;
   const v = vec(a.ll, b.ll);
   p.hd = Math.atan2(v[0], v[1]);   // 面朝方向：0 = 北，順時針（弧度）
-  if(p.fig) p.fig.style.transform = `rotate(${p.hd}rad)`;
+  if(p.fig) p.fig.style.transform = `rotate(${p.hd+(p.spin||0)}rad)`;
 }
 function spawnPed(o, isTarget, body){
   const a = pick(graph), b = pick(a.adj);
@@ -1463,20 +1482,22 @@ function spawnPed(o, isTarget, body){
   p.m = L.marker(p.ll, {icon:makeIcon(p), interactive:false, keyboard:false}).addTo(map);
   const el = p.m.getElement();
   p.root = el.firstChild; p.fig = el.querySelector('.fig');
+  p.lm = {}; for(const g of p.fig.querySelectorAll('.lm')) p.lm[g.dataset.lm] = {el:g, a:0, v:0};
+  p.off=[0,0]; p.kv=[0,0]; p.spin=0; p.sv=0;
   p.fig.style.transform = `rotate(${p.hd}rad)`;
   peds.push(p); return p;
 }
 // 命中判定：把落點換算到角色的局部座標，看打到哪個部位
 function hitPart(p, ll, tolExtra=0){
-  const d = vec(p.ll, ll), c = Math.cos(p.hd), s = Math.sin(p.hd);
+  const hd = p.hd+(p.spin||0), d = vec(p.ll, ll), c = Math.cos(hd), s = Math.sin(hd);
   // 換回基準尺寸（除以整體倍率與這個人的體型倍率，和 SVG 的 scale 完全對應）
   const x = (d[0]*c - d[1]*s)/(BODY_SCALE*p.sx), y = (d[0]*s + d[1]*c)/(BODY_SCALE*p.sy);
   if(Math.hypot(x,y) > 1.4) return null;
   const part = partAtLocal(x,y,tolExtra);
   return part ? {part, x, y} : null;
 }
-function addWound(p, x, y){
-  const g = p.fig.querySelector('.body');
+function addWound(p, x, y, pid){
+  const k = LIMB_OF[pid], g = (k && p.lm[k]) ? p.lm[k].el : p.fig.querySelector('.body');   // 傷口跟著那一節肢體擺動
   const w = document.createElementNS('http://www.w3.org/2000/svg','circle');
   w.setAttribute('cx', x); w.setAttribute('cy', -y); w.setAttribute('r', 0.035); w.setAttribute('class','wound');
   g.appendChild(w);
@@ -1603,6 +1624,71 @@ function updHud(){
   $('extract').textContent = settle ? '收工撤離' : '撤離';
 }
 
+/* ---------- 中彈物理 ----------
+   子彈的衝量讓身體：1) 沿彈道方向被推開（滑行後摩擦停下）；2) 打偏中心會被打轉；
+   3) 被打中的那一節肢體繞關節甩開，其他肢體因為慣性往反方向甩，再像彈簧一樣晃回來。
+   位移與轉角也套用在命中判定上，畫面看到哪裡就打得到哪裡。 */
+const KB_FRICTION = 4.5;        // 滑行摩擦（越大停得越快）
+const SPIN_FRICTION = 4;
+function placePed(p){ const b=lerp(p); p.ll=[b[0]+p.off[1]/MLAT, b[1]+p.off[0]/MLNG]; p.m.setLatLng(p.ll); }
+function toLocal(p, e, n){ const hd=p.hd+(p.spin||0), c=Math.cos(hd), s=Math.sin(hd); return [e*c - n*s, e*s + n*c]; }
+function limbKick(p, k, hx, hy, fx, fy, imp, minT=0.15){   // 在局部點 (hx,hy) 施加方向 (fx,fy) 的衝量，算出關節的角速度（minT＝保底力矩，子彈順著肢體方向打也會甩）
+  const L=p.lm[k]; if(!L) return;
+  const pv=LIMBS[k].pv, rx=hx-pv[0], ry=hy-pv[1];
+  let torque = rx*fy - ry*fx;                   // 逆時針為正（y 朝前的座標）
+  torque = (torque<0 ? -1 : 1) * Math.max(Math.abs(torque), minT);
+  L.v += -torque*imp;                           // SVG 的 y 朝下：角度正負相反
+}
+/* power：0 非致命、1 致命、2 爆頭；ammoKey 影響衝擊力 */
+const KICK_AMMO = {hv:1.25, hp:1.35, sub:0.75, frag:1.4};
+function hitPhysics(p, dirE, dirN, hit, power, ammoKey){
+  if(!p.lm) return;
+  const m = Math.hypot(dirE,dirN)||1; dirE/=m; dirN/=m;
+  const f = (KICK_AMMO[ammoKey]||1) / Math.sqrt(p.sx*p.sy);   // 體型越大越推不動
+  const pid = hit ? hit.part.id : 'chest', limb = LIMB_OF[pid];
+  // 1) 擊退：打中軀幹最有力，打中手腳只推一點
+  const kb = (power===2 ? 6 : power===1 ? 5 : 2.5) * (limb && limb!=='hd' ? 0.5 : 1) * f;
+  p.kv[0] += dirE*kb; p.kv[1] += dirN*kb;
+  // 2) 打轉：衝量偏離身體中心就會轉
+  const [fx,fy] = toLocal(p, dirE, dirN);
+  const hx = hit ? hit.x : 0, hy = hit ? hit.y : 0.2;
+  p.sv += Math.max(-4.5, Math.min(4.5, -(hx*fy - hy*fx) * (power ? 14 : 10) * f));   // 每槍最多轉約 60°
+  // 3) 肢體：被打中的那節猛甩，其他節因慣性往反方向晃
+  const imp = (power ? 1400 : 1000) * f;
+  if(limb) limbKick(p, limb, hx, hy, fx, fy, imp*(limb==='hd' ? 0.9 : 1.4), 0.35);
+  for(const k in p.lm) if(k!==limb){
+    const pv=LIMBS[k].pv, tip=[pv[0]*1.8, pv[1] + (k[1]==='l' ? -0.6 : k==='hd' ? 0.25 : -0.45)];   // 肢體末端大概的位置
+    limbKick(p, k, tip[0], tip[1], -fx, -fy, imp*(0.35+Math.random()*0.35));
+  }
+}
+function stepPhysics(dt){
+  for(const p of peds){
+    if(!p.lm) continue;
+    let moved = false;
+    if(p.kv[0]||p.kv[1]){
+      p.off[0]+=p.kv[0]*dt; p.off[1]+=p.kv[1]*dt;
+      const k=Math.exp(-KB_FRICTION*dt); p.kv[0]*=k; p.kv[1]*=k;
+      if(Math.hypot(p.kv[0],p.kv[1])<0.02) p.kv[0]=p.kv[1]=0;
+      moved = true;
+    }
+    if(p.sv){
+      p.spin += p.sv*dt; p.sv *= Math.exp(-SPIN_FRICTION*dt); if(Math.abs(p.sv)<0.01) p.sv=0;
+      p.fig.style.transform = `rotate(${p.hd+p.spin}rad)`;
+    }
+    // 肢體：阻尼彈簧，晃幾下回到原位（死掉的人肌肉放鬆：彈簧比較軟、晃比較久）
+    const K = p.alive ? 55 : 26, C = p.alive ? 6 : 4;
+    for(const k in p.lm){
+      const L=p.lm[k]; if(!L.v && !L.a) continue;
+      L.v += (-K*L.a - C*L.v)*dt; L.a += L.v*dt;
+      L.a = Math.max(-75, Math.min(75, L.a));
+      if(Math.abs(L.a)<0.2 && Math.abs(L.v)<2){ L.a=0; L.v=0; }
+      const pv=LIMBS[k].pv;
+      L.el.setAttribute('transform', L.a ? `rotate(${L.a.toFixed(1)} ${pv[0]} ${-pv[1]})` : '');
+    }
+    if(moved && (!p.alive || p.sleep || state!=='play')) placePed(p);   // 不會自己走的人（屍體、昏睡）由這裡更新位置
+  }
+}
+
 /* ---------- 主迴圈 ---------- */
 let last=performance.now(), hudAcc=0;
 const CRAWL_V = 0.12;   // 倒地爬行速度（m/s）
@@ -1615,13 +1701,13 @@ function frame(now){
         let d=CRAWL_V*dt;
         p.drip=(p.drip||0)+d; if(p.drip>0.5){ p.drip=0; addBlood(p.ll, rand(.25,.45), rand(0,6.28), 3, 0); }
         while(d>0){ const rem=p.len-p.t; if(d<rem){p.t+=d; d=0;} else {d-=rem; nextEdge(p); p.wait=0;} }
-        p.ll=lerp(p); p.m.setLatLng(p.ll); continue;
+        placePed(p); continue;
       }
       if(p.wait>0 && p.panic<=0){ p.wait-=dt; continue; }
       if(p.panic>0) p.panic-=dt;
       let d=p.base*(p.panic>0 ? (p.isTarget?3.6:2.8) : 1)*dt;
       while(d>0){ const rem=p.len-p.t; if(d<rem){p.t+=d; d=0;} else {d-=rem; nextEdge(p);} }
-      p.ll=lerp(p); p.m.setLatLng(p.ll);
+      placePed(p);
     }
     timeLeft-=dt; hudAcc+=dt;
     stepCountdown(dt);
@@ -1634,6 +1720,7 @@ function frame(now){
       else endGame(false,'時間到，噁男已經離開區域。');
     }
   }
+  stepPhysics(dt);   // 結算後也繼續跑完最後一槍的物理
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -1745,6 +1832,7 @@ function resolveShot(aim, aimed, ammoKey){
   if(A.splash){
     for(const p of peds) if(p.alive && !p.isTarget && p!==best && meters(aim,p.ll)<=A.splash){
       p.alive=false; p.root.classList.add('dead'); civKills++; bloodHit(p, true, 'chest');
+      { const v=vec(aim, p.ll); hitPhysics(p, v[0]||1e-3, v[1], null, 1, 'frag'); }   // 被破片往外炸開
       log(`破片波及路人（${p.shirt.n}上衣）！酬勞 -${CIV_PAY_CUT*100}%、聲望 -${CIV_REP}`, 'var(--warn)');
     }
   }
@@ -1758,7 +1846,9 @@ function resolveShot(aim, aimed, ammoKey){
       log(`⚠ 麻醉鏢誤射路人（${best.shirt.n}上衣、${best.hat.n}）！酬勞 -${CIV_PAY_CUT*100}%、聲望 -${CIV_REP}`, 'var(--warn)');
     }
   }else if(hit){
-    addWound(best, hit.x, hit.y);
+    addWound(best, hit.x, hit.y, hit.part.id);
+    { const lt = A.allLethal ? true : hit.part.lethal, v = vec(shooter, aim);
+      hitPhysics(best, v[0], v[1], hit, lt ? (hit.part.id==='head' ? 2 : 1) : 0, A.splash ? 'frag' : ammoKey); }
     bloodHit(best, A.allLethal ? true : hit.part.lethal, hit.part.id);
     if(best.isTarget){
       const st = job.req.steps, part = hit.part;
@@ -2179,6 +2269,16 @@ if(loadJobs()){ jobs.forEach(j=>seenJobs.add(j.id)); if(jobs.every(j=>j.closed))
 else refreshJobs();                                    // 沒有才抓新的
 renderTerminal();
 $('dnOnion').textContent = 'nmk' + hexStr(7).slice(0,13) + '…onion';
+/* 暗網畫面的躁點：只有畫面開著（且不是結算小框）時才重畫，解析度取螢幕的 1/3 */
+{ const cv=$('dnNoise'), cx=cv.getContext('2d'), ov=$('overlay');
+  setInterval(()=>{
+    if(ov.classList.contains('hidden') || ov.classList.contains('endMode')) return;
+    const w=innerWidth/3|0, h=innerHeight/3|0;
+    if(cv.width!==w || cv.height!==h){ cv.width=w; cv.height=h; }
+    const img=cx.createImageData(w,h), d=img.data;
+    for(let k=0;k<d.length;k+=4){ const v=Math.random()*255|0; d[k]=d[k+1]=d[k+2]=v; d[k+3]=255; }
+    cx.putImageData(img,0,0);
+  }, 90); }
 setInterval(()=>{ if(!$('overlay').classList.contains('hidden')) $('dnPing').textContent = 380 + Math.floor(Math.random()*260); }, 1200);
 dnBoot();
 // 除錯介面：網址加上 ?debug 才開放（例如 index.html?debug）
