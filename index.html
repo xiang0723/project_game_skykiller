@@ -56,11 +56,34 @@
        animation:bloodIn var(--t,.35s) ease-out both}
   @keyframes bloodIn{from{transform:rotate(var(--rot)) scale(.15);opacity:.3}to{transform:rotate(var(--rot)) scale(1);opacity:1}}
   .spray{position:absolute;left:0;top:0;pointer-events:none;transform:rotate(var(--rot))}
-  .spray i{position:absolute;border-radius:50%;background:#c00010;width:calc(var(--m)*var(--sz)*1px);height:calc(var(--m)*var(--sz)*1px);
-       margin:calc(var(--m)*var(--sz)*-.5px) 0 0 calc(var(--m)*var(--sz)*-.5px);box-shadow:0 0 2px rgba(80,0,0,.8);
-       animation:spray .55s cubic-bezier(.15,.7,.3,1) forwards}
-  @keyframes spray{from{transform:translate(0,0) scale(1.3);opacity:1}
-       to{transform:translate(calc(var(--m)*var(--dx)*1px),calc(var(--m)*var(--dy)*1px)) scale(.6);opacity:0}}
+  /* 血滴：--ar = 長寬比（>1 是甩出去的長條血絲），--dur 飛行時間；飛到終點後停一下才淡出（落地的感覺） */
+  .spray i{position:absolute;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ff2a3a,#b0000e 55%,#5a0008);
+       width:calc(var(--m)*var(--sz)*1px);height:calc(var(--m)*var(--sz)*var(--ar,1)*1px);
+       margin:calc(var(--m)*var(--sz)*var(--ar,1)*-.5px) 0 0 calc(var(--m)*var(--sz)*-.5px);box-shadow:0 0 3px rgba(120,0,0,.9);
+       transform-origin:50% 50%;animation:spray var(--dur,.6s) cubic-bezier(.12,.75,.25,1) forwards}
+  @keyframes spray{0%{transform:translate(0,0) rotate(var(--ang,0rad)) scale(1.6);opacity:1}
+       70%{transform:translate(calc(var(--m)*var(--dx)*1px),calc(var(--m)*var(--dy)*1px)) rotate(var(--ang,0rad)) scale(1);opacity:1}
+       100%{transform:translate(calc(var(--m)*var(--dx)*1px),calc(var(--m)*var(--dy)*1px)) rotate(var(--ang,0rad)) scale(.8);opacity:0}}
+  /* 血霧：命中瞬間炸開的一團紅霧 */
+  .spray b{position:absolute;border-radius:50%;width:calc(var(--m)*var(--ms)*1px);height:calc(var(--m)*var(--ms)*1px);
+       margin:calc(var(--m)*var(--ms)*-.5px) 0 0 calc(var(--m)*var(--ms)*-.5px);
+       background:radial-gradient(circle,rgba(220,0,20,.85),rgba(160,0,15,.45) 45%,rgba(120,0,10,0) 70%);
+       animation:mist var(--dur,.7s) ease-out forwards}
+  @keyframes mist{from{transform:translate(0,0) scale(.15);opacity:1}to{transform:translate(0,calc(var(--m)*var(--my,0)*1px)) scale(1);opacity:0}}
+  /* 爆頭的衝擊波圈 */
+  .spray u{position:absolute;border-radius:50%;width:calc(var(--m)*2.6px);height:calc(var(--m)*2.6px);margin:calc(var(--m)*-1.3px) 0 0 calc(var(--m)*-1.3px);
+       border:3px solid rgba(255,40,60,.9);box-shadow:0 0 10px rgba(255,0,30,.8),inset 0 0 8px rgba(255,0,30,.6);animation:shock .45s ease-out forwards}
+  @keyframes shock{from{transform:scale(.1);opacity:1}to{transform:scale(1.5);opacity:0}}
+  /* 螢幕邊緣紅光＋命中震動 */
+  #gore{position:fixed;inset:0;pointer-events:none;z-index:515;opacity:0;
+       background:radial-gradient(ellipse at center,rgba(0,0,0,0) 45%,rgba(160,0,15,.55) 80%,rgba(90,0,8,.9))}
+  #gore.go{animation:gore .55s ease-out}
+  #gore.go.big{animation:gore 0.9s ease-out}
+  @keyframes gore{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
+  body.hitshake #map{animation:hshake .32s ease-out}
+  body.hitshake.big #map{animation:hshake .5s ease-out}
+  @keyframes hshake{0%{transform:translate(0,0)}15%{transform:translate(-7px,5px)}30%{transform:translate(6px,-6px)}
+       45%{transform:translate(-5px,-3px)}60%{transform:translate(4px,4px)}80%{transform:translate(-2px,1px)}100%{transform:translate(0,0)}}
   /* 購買回饋：按鈕旁飄出扣款數字、資金數字往下跑並閃紅 */
   .payfly{position:fixed;z-index:1200;pointer-events:none;font-weight:bold;font-size:15px;color:#ff5c7a;
        text-shadow:0 0 4px #000,0 0 8px rgba(255,60,90,.6);white-space:nowrap;transform:translate(-50%,-50%);animation:payfly 1.1s ease-out forwards}
@@ -358,6 +381,7 @@
 <div id="rangetag"></div>
 <div id="aimpt" class="hidden"></div>
 <div id="flash"></div>
+<div id="gore"></div>
 
 <!-- 左側資訊欄：狀態 → 噁男與委託進度 → 戰況紀錄 → 彈藥，由上往下讀 -->
 <div id="side">
@@ -499,7 +523,7 @@
 
 <script src="data/incidents.js?v=0.3.6"></script>
 <script src="data/clients.js?v=0.3.6"></script>
-<script src="js/audio.js?v=0.3.4"></script>   <!-- 改 audio.js 時一併改版本號，避免瀏覽器用到舊的快取 -->
+<script src="js/audio.js?v=0.3.7"></script>   <!-- 改 audio.js 時一併改版本號，避免瀏覽器用到舊的快取 -->
 <script>
 (() => {
 'use strict';
@@ -1442,7 +1466,7 @@ function addWound(p, x, y){
 /* ---------- 血跡 ----------
    擊中時沿子彈方向噴出血花（短暫動畫），地上留下血跡（整局保留）；倒地爬行時一路滴血 */
 let bloodMarks = [];
-const BLOOD_MAX = 160;
+const BLOOD_MAX = 260;
 function bloodSVG(n, stretch){   // 不規則血泊：一團主血跡＋往子彈方向甩出去的小點
   let c = `<circle cx="0" cy="0" r=".42" fill="#5c0008"/>`;
   for(let i=0;i<n;i++){
@@ -1457,22 +1481,48 @@ function addBlood(ll, d, rot, n, stretch, t){
     icon:L.divIcon({className:'pedicon', iconSize:[0,0],
       html:`<div class="blood" style="--d:${d.toFixed(2)};--rot:${rot.toFixed(2)}rad;--t:${t||.35}s">${bloodSVG(n, stretch)}</div>`})}).addTo(map);
   bloodMarks.push(m);
-  if(bloodMarks.length>BLOOD_MAX) map.removeLayer(bloodMarks.shift());
+  while(bloodMarks.length>BLOOD_MAX) map.removeLayer(bloodMarks.shift());
 }
-function bloodHit(p, lethal){   // 擊中：噴血花＋地上血跡（致命傷的血泊比較大，會慢慢擴散）
+/* 擊中：往子彈方向炸開大量血滴與血霧，落地的血滴留下血點；爆頭再加衝擊波。
+   power：0 = 非致命、1 = 致命、2 = 爆頭 */
+const fwd = (ll, rot, m) => [ll[0] + Math.cos(rot)*m/MLAT, ll[1] + Math.sin(rot)*m/MLNG];   // 往 rot 方向走 m 公尺
+function bloodHit(p, lethal, partId){
+  const power = partId==='head' && lethal ? 2 : lethal ? 1 : 0;
   const v = vec(shooter, p.ll), rot = Math.atan2(v[0], v[1]);   // 子彈前進方向（0 = 北，順時針）
-  let drops = '';
-  for(let i=0;i<14;i++){
-    const a = rand(-0.6,0.6), r = rand(0.5, 1.8);
-    drops += `<i style="--sz:${rand(.05,.14).toFixed(2)};--dx:${(Math.sin(a)*r).toFixed(2)};--dy:${(-Math.cos(a)*r).toFixed(2)};animation-delay:${rand(0,.06).toFixed(2)}s"></i>`;
+  const N = [26, 48, 70][power], R = [2.0, 3.4, 4.6][power], SPREAD = [0.55, 0.75, 1.0][power];
+  let html = '', lands = [];
+  // 血霧（往前飄一點）
+  html += `<b style="--ms:${[1.6,2.6,3.6][power]};--my:${-[0.4,0.8,1.2][power]};--dur:${[.55,.75,.9][power]}s"></b>`;
+  if(power===2) html += `<b style="--ms:2.2;--my:0;--dur:.5s"></b><u></u>`;
+  for(let i=0;i<N;i++){
+    const back = Math.random() < 0.12;                                // 少數從入口往回噴
+    const an = back ? Math.PI + rand(-0.5,0.5) : rand(-SPREAD, SPREAD)*(Math.random()<.7 ? .6 : 1);
+    const r = back ? rand(0.2, 0.9) : rand(0.3, R) * (1 - Math.abs(an)/SPREAD*.35);
+    const streak = !back && Math.random() < 0.45;                    // 長條血絲
+    const sz = streak ? rand(.05,.11) : rand(.05, power ? .2 : .14);
+    const dx = Math.sin(an)*r, dy = -Math.cos(an)*r;
+    html += `<i style="--sz:${sz.toFixed(2)};--ar:${streak?rand(2.2,4).toFixed(1):1};--ang:${an.toFixed(2)}rad;--dx:${dx.toFixed(2)};--dy:${dy.toFixed(2)};--dur:${rand(.45,.8).toFixed(2)}s;animation-delay:${rand(0,.07).toFixed(2)}s"></i>`;
+    if(!streak && sz > .09 && lands.length < [4,9,14][power]) lands.push([an, r, sz]);
   }
   const sp = L.marker(p.ll, {interactive:false, keyboard:false, zIndexOffset:20000,
-    icon:L.divIcon({className:'pedicon', iconSize:[0,0], html:`<div class="spray" style="--rot:${rot.toFixed(2)}rad">${drops}</div>`})}).addTo(map);
-  setTimeout(()=>map.removeLayer(sp), 700);
-  // 噴到後方地上的血跡
-  const back = [p.ll[0] + Math.cos(rot)*0.7/MLAT, p.ll[1] + Math.sin(rot)*0.7/MLNG];
-  setTimeout(()=>{ if(state!=='idle') addBlood(back, rand(.7,1.0), rot, 9, 1, .25); }, 120);
-  addBlood(p.ll, lethal ? 1.7 : 0.9, rot, lethal ? 8 : 5, 0, lethal ? 3 : .5);
+    icon:L.divIcon({className:'pedicon', iconSize:[0,0], html:`<div class="spray" style="--rot:${rot.toFixed(2)}rad">${html}</div>`})}).addTo(map);
+  setTimeout(()=>map.removeLayer(sp), 1000);
+  // 落地的血點（血滴飛到的位置）
+  setTimeout(()=>{ if(state==='idle') return;
+    for(const [an, r, sz] of lands) addBlood(fwd(p.ll, rot+an, r), sz*rand(3,5), rot+an, 3, 0, .2);
+  }, 420);
+  // 噴到後方地上的一大片
+  setTimeout(()=>{ if(state!=='idle') addBlood(fwd(p.ll, rot, [0.7,1.1,1.5][power]), [0.9,1.5,2.2][power], rot, [9,13,18][power], 1+power*.6, .25); }, 120);
+  addBlood(p.ll, [0.9,1.8,2.3][power], rot, [5,9,12][power], 0, power ? 3 : .5);
+  screenGore(power);
+  hitSound(power);
+}
+// 命中都會震動畫面；致命傷再加螢幕邊緣紅光（爆頭更久、震得更大）
+function screenGore(power){
+  const g=$('gore'); g.classList.remove('go','big'); void g.offsetWidth;
+  if(power>=1){ g.classList.add('go'); if(power===2) g.classList.add('big'); }
+  document.body.classList.remove('recoil','hitshake','big'); void document.body.offsetWidth;
+  document.body.classList.add('hitshake'); if(power===2) document.body.classList.add('big');
 }
 function lerp(p){ const k=p.t/p.len; return [p.a.ll[0]+(p.b.ll[0]-p.a.ll[0])*k, p.a.ll[1]+(p.b.ll[1]-p.a.ll[1])*k]; }
 function nextEdge(p){
@@ -1676,14 +1726,14 @@ function resolveShot(aim, aimed, ammoKey){
   // 破片彈：落點附近的路人被波及
   if(A.splash){
     for(const p of peds) if(p.alive && !p.isTarget && p!==best && meters(aim,p.ll)<=A.splash){
-      p.alive=false; p.root.classList.add('dead'); civKills++; bloodHit(p, true);
+      p.alive=false; p.root.classList.add('dead'); civKills++; bloodHit(p, true, 'chest');
       log(`破片波及路人（${p.shirt.n}上衣）！酬勞 -${CIV_PAY_CUT*100}%、聲望 -${CIV_REP}`, 'var(--warn)');
     }
   }
 
   if(hit){
     addWound(best, hit.x, hit.y);
-    bloodHit(best, A.nonlethal ? false : A.allLethal ? true : hit.part.lethal);
+    bloodHit(best, A.nonlethal ? false : A.allLethal ? true : hit.part.lethal, hit.part.id);
     if(best.isTarget){
       const st = job.req.steps, part = hit.part;
       let note = '';
@@ -2092,7 +2142,7 @@ dnBoot();
 if(/[?&]debug\b/.test(location.search)){
   window.skyMap = map;
   window.nmkDebug = { get target(){ return target; }, get save(){ return save; }, ballistics:a=>ballistics(a), fire,
-    partAtLocal, CLIENTS, makeClient, CL_COUNT, INCIDENTS, makeJob, incidentCount, pickIncident,
+    partAtLocal, bloodHit, get peds(){ return peds; }, get map(){ return map; }, CLIENTS, makeClient, CL_COUNT, INCIDENTS, makeJob, incidentCount, pickIncident,
     get timeLeft(){ return timeLeft; }, set timeLeft(v){ timeLeft=v; }, get state(){ return state; },
     sfx:{gunSound, boltSound, tickSound, alarmSound, stepCountdown}, get actx(){ return actx; },
     // 把行人可以走的路網畫在地圖上（檢查道路資料用）；再呼叫一次就關掉

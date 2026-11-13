@@ -3,7 +3,7 @@
    槍聲 = 超音速彈頭的「啪」+ 槍口爆音的低頻衝擊 + 寬頻爆炸噪音 + 街道建築的回音殘響。
    消音器 / 亞音速彈會讓槍聲變悶變小。開槍後依槍機速度播放拉栓上膛聲。
    SFX_CFG 是各類音效的音量倍率，sfx-test.html 可以即時調整並匯出。 */
-const SFX_CFG = { master:1, reverb:0.55, gun:1, bolt:1, tick:1, alarm:1, shop:1 };
+const SFX_CFG = { master:1, reverb:0.55, gun:1, bolt:1, tick:1, alarm:1, shop:1, hit:1 };
 let VK = 1;   // 目前這個音效的音量倍率（各音效函式開頭設定）
 let actx=null, sfxMaster=null, sfxVerb=null, sfxGain=null, sfxVerbGain=null, muted=false;
 try{ muted = localStorage.getItem('nmk_mute')==='1'; }catch(e){}
@@ -173,6 +173,25 @@ function buySound(){
 function denySound(){
   if(muted) return; VK=SFX_CFG.shop;
   try{ const a=audio(), t=a.currentTime; tone(t, 0.12, 'square', 220, 200, 0.1); tone(t+0.16, 0.16, 'square', 180, 160, 0.1); }catch(e){}
+}
+/* 命中：遊戲感的回饋音（不是寫實的遠距離聲音）
+   低頻「咚」的肉擊＋濕黏的「啪嚓」＋幾滴血落地的細碎聲；致命更厚，爆頭再加一聲脆裂。power：0 非致命、1 致命、2 爆頭 */
+function hitSound(power=1){
+  if(muted) return; VK=SFX_CFG.hit;
+  try{
+    const a=audio(), t=a.currentTime, k=[0.7,1,1.25][power];
+    tone(t, 0.16+0.06*power, 'sine', 120, 42, 0.55*k);                      // 肉擊「咚」
+    tone(t, 0.05, 'triangle', 320, 140, 0.18*k);                            // 擊中瞬間的硬度
+    nz(t+0.004, 0.14+0.05*power, 'bandpass', 1100, 0.9, 0.5*k, 3, 0.15);    // 濕黏「啪嚓」
+    nz(t+0.01, 0.09, 'lowpass', 600, 0.7, 0.35*k, 3);
+    if(power===2){                                                           // 爆頭：脆裂＋第二次炸開
+      nz(t, 0.03, 'highpass', 2500, 0.8, 0.45, 2, 0.2);
+      clack(t+0.005, 0.25, [[780,1,.05],[1430,.6,.035]], 0);
+      nz(t+0.05, 0.22, 'bandpass', 700, 0.8, 0.4, 3, 0.25);
+    }
+    for(let i=0;i<3+power*3;i++)                                             // 血滴落地
+      nz(t+0.12+Math.random()*0.35, 0.025, 'bandpass', 1800+Math.random()*1500, 2, 0.08*k*(1-i*0.08), 2);
+  }catch(e){}
 }
 // 靜音開關（和遊戲的 M 鍵是同一個設定，存在 localStorage）
 const Sound = {
