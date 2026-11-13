@@ -497,7 +497,8 @@
   </div>
 </div>
 
-<script src="data/incidents.js?v=0.3.5"></script>
+<script src="data/incidents.js?v=0.3.6"></script>
+<script src="data/clients.js?v=0.3.6"></script>
 <script src="js/audio.js?v=0.3.4"></script>   <!-- 改 audio.js 時一併改版本號，避免瀏覽器用到舊的快取 -->
 <script>
 (() => {
@@ -701,6 +702,21 @@ const ammoTotal = () => AMMO_KEYS.reduce((s,k)=>s+(save.ammo[k]||0), 0);
 const money = n => '$' + Math.round(n).toLocaleString('en-US');
 
 /* ---------- 委託產生器 ---------- */
+/* 委託人：暱稱．身分，從 data/clients.js 的兩個大清單分開隨機組合（下面的 CLIENTS 只在資料檔沒載入時備用）。
+   w = 在公司上班（職場類的事件只配給他們）；stu = 大專學生 */
+const CL = window.NMK_CLIENTS || null;
+const CL_NICK = CL && (()=>{ const u=a=>[...new Set(a)], N=CL.nick;
+  return {kid:u(N.kid), teen:u([...N.kid,...N.teen]), adult:u([...N.kid,...N.teen,...N.adult])}; })();
+function makeClient(){
+  if(!CL) return pick(CLIENTS);
+  const J = CL.job, r = Math.random();
+  // 比例：國小 12%、國高中 20%、大專 13%、公司上班 30%、其他工作 25%
+  const [job, nicks, f] = r<.12 ? [J.kid, CL_NICK.kid, {kid:1}] : r<.32 ? [J.teen, CL_NICK.teen, {minor:1}] :
+    r<.45 ? [J.uni, CL_NICK.adult, {stu:1}] : r<.75 ? [J.work, CL_NICK.adult, {w:1}] : [J.other, CL_NICK.adult, {}];
+  const nick = Math.random() < .15 ? '匿名' : pick(nicks);
+  return {n: nick + '．' + pick(job), ...f};
+}
+const CL_COUNT = () => CL ? {nick: CL_NICK.adult.length, job: Object.values(CL.job).reduce((s,a)=>s+new Set(a).size,0)} : null;
 // 委託人：minor = 國高中生（只搭配標記 m 的非露骨描述）；kid = 國小生（只搭配標記 k、用小孩口吻寫的非露骨描述）。
 const CLIENTS = [
   {n:'妞妞．國小五年級',kid:1},{n:'匿名．國小六年級',kid:1},{n:'小米．國小四年級',kid:1},{n:'安安．國小六年級',kid:1},
@@ -714,7 +730,7 @@ const CLIENTS = [
 // lv：1 輕、2 中、3 重（極度噁心）。m：未成年委託人也可使用（描述不露骨）。
 const INCIDENTS = [
   // ── 輕 ──
-  {lv:1, t:'他每天在公司樓下等我，傳訊息說「妳今天穿裙子很好看」，我從來沒給過他電話。'},
+  {lv:1, w:1, t:'他每天在公司樓下等我，傳訊息說「妳今天穿裙子很好看」，我從來沒給過他電話。'},
   {lv:1, t:'他在巷口對路過的女生吹口哨、評論身材，還偷拍上傳到群組幫大家「打分數」。'},
   {lv:1, t:'健身房裡他一直盯著我，假裝路過，用手機對著我深蹲的時候拍。'},
   {lv:1, m:1, t:'他在網路上不停私訊我，被封鎖就開新帳號，已經換了二十幾個。'},
@@ -725,7 +741,7 @@ const INCIDENTS = [
   {lv:1, m:1, t:'他每天在學校後門拿手機拍穿制服的女生，被警衛趕走隔天又來。'},
   {lv:1, t:'我送餐到他家，他開門只穿一條內褲，硬要我進去「拿小費」。'},
   {lv:1, m:1, t:'放學路上有個男人騎機車跟著我，停下來問我「一次多少錢」。'},
-  {lv:1, t:'他是公司主管，開會時會故意把手放在我大腿上，說是「鼓勵」。'},
+  {lv:1, w:1, t:'他是公司主管，開會時會故意把手放在我大腿上，說是「鼓勵」。'},
   // ── 國小生（小孩口吻，不露骨）──
   {lv:1, k:1, t:'有個叔叔每天在校門口，一直拿手機拍我們，還問我住在哪裡。'},
   {lv:1, k:1, t:'公園裡有個怪叔叔一直跟著我和妹妹，我們跑他也跑，我們好怕。'},
@@ -739,13 +755,13 @@ const INCIDENTS = [
   {lv:2, m:1, t:'公車上的咸豬手，被抓過三次，每次都交保，現在還是天天搭同一路線。'},
   {lv:2, t:'他在捷運手扶梯上用藏在鞋子裡的鏡頭拍我裙底，影片被放到付費群組賣。'},
   {lv:2, m:1, t:'他在網路上肉搜到我的住址，常在我家樓下徘徊，還在信箱裡塞他自己的照片。'},
-  {lv:2, t:'前同事跟騷我半年，保護令對他根本沒用，他還跑去我老家按門鈴。'},
+  {lv:2, w:1, t:'前同事跟騷我半年，保護令對他根本沒用，他還跑去我老家按門鈴。'},
   {lv:2, t:'在夜市人擠人的時候，他用下體一直貼著我的屁股磨蹭，事後還在社群上炫耀「今天又有收穫」。'},
   {lv:2, m:1, t:'他在公園對放學的女學生暴露，被抓了還是緩起訴，又回到同一個公園。'},
   {lv:2, t:'他在健身房偷拍女生換衣服被抓，賠了錢就沒事了，現在換到附近另一間。'},
   {lv:2, t:'我值夜班時他每晚都來，用手機對著我拍，還一路跟到我下班的路上。'},
   {lv:2, t:'他從女廁隔間上方伸手機進來偷拍，被發現就跑了，警察說找不到人。'},
-  {lv:2, t:'他用 AI 把我的照片合成裸照，傳給我全部的同事和家人。'},
+  {lv:2, w:1, t:'他用 AI 把我的照片合成裸照，傳給我全部的同事和家人。'},
   {lv:2, t:'圖書館裡他坐在我對面，在桌子底下一邊看著我一邊自慰。'},
   {lv:2, t:'他偷走我晾在陽台的內衣褲，傳照片給我看他穿在身上的樣子。'},
   {lv:2, m:1, t:'他在補習班電梯裡故意擠過來摸女學生的腰，補習班說他是「老客戶的家長」，不處理。'},
@@ -757,7 +773,7 @@ const INCIDENTS = [
   {lv:3, t:'他在女廁天花板裝針孔，拍了上百個女生，影片賣到海外網站，只關幾個月就出來了。'},
   {lv:3, t:'他半夜爬到我家窗外，一邊看我睡覺一邊自慰，鄰居拍到報警，他隔週又來了。'},
   {lv:3, t:'他在夜店對我的酒下藥，我醒來時在他車上，衣服被脫掉一半。檢察官說證據不足。'},
-  {lv:3, t:'他每天寄用過的保險套到我公司，附上寫著我名字的紙條。'},
+  {lv:3, w:1, t:'他每天寄用過的保險套到我公司，附上寫著我名字的紙條。'},
   {lv:3, t:'他在公車上拉開褲子拉鍊，抓著我的手往他的下體按，司機假裝沒看到。'},
   {lv:3, t:'他是我的房東，在浴室裝攝影機，還拿影片威脅我陪他睡，不然就公開。'},
   {lv:3, t:'他在網路上散布我的私密影片和住址，留言叫大家「去找她」，已經有陌生人半夜來敲門。'},
@@ -774,6 +790,8 @@ const SEV_BONUS = [0, 0, 500, 1200];   // 情節越重，委託人湊得越多
 const TX = window.NMK_TEXT || null;
 let recentInc = [];
 // 和這件事說得通的後續：後續的 n（需要的性質）空白，或和行為的 k 至少有一個字相同
+const needJob = a => /[wj]/.test(a.k||'');   // w 職場、j 提到「我的公司」
+const placesFor = (cat, cl) => TX.places[cat].filter(p => cl.w || !/公司|下班/.test(p));
 const afterFor = a => TX.after[a.who].filter(f => !f.n || [...f.n].some(ch => (a.k||'').includes(ch)));
 function pickIncident(cl){
   const who = cl.kid ? 'k' : cl.minor ? 'm' : 'a';
@@ -781,12 +799,12 @@ function pickIncident(cl){
   const recentAct = new Set([...recent].filter(k=>k.startsWith('g')).map(k=>k.split('|')[0]));
   let res = null;
   if(TX && Math.random() < 0.8){
-    const acts = TX.acts.map((a,i)=>[a,i]).filter(([a,i])=>a.who===who && !recentAct.has('g'+i));
-    const pool = acts.length ? acts : TX.acts.map((a,i)=>[a,i]).filter(([a])=>a.who===who);
+    const acts = TX.acts.map((a,i)=>[a,i]).filter(([a,i])=>a.who===who && (cl.w || !needJob(a)) && !recentAct.has('g'+i));
+    const pool = acts.length ? acts : TX.acts.map((a,i)=>[a,i]).filter(([a])=>a.who===who && (cl.w || !needJob(a)));
     for(let tries=0; tries<20 && !res; tries++){
       const [a,ai] = pick(pool);
       const cat = a.pl.length ? pick(a.pl) : null;
-      const places = cat ? TX.places[cat] : [''];
+      const places = cat ? placesFor(cat, cl) : [''];
       const pi = Math.floor(Math.random()*places.length);
       const afters = afterFor(a);
       const fi = Math.floor(Math.random()*afters.length);
@@ -796,7 +814,7 @@ function pickIncident(cl){
     }
   }
   if(!res){   // 手寫描述：國小生只用 k；國高中生只用 m；成年人用 k 以外的全部
-    const ok = i => { const x=INCIDENTS[i]; return who==='k' ? x.k : who==='m' ? x.m : !x.k; };
+    const ok = i => { const x=INCIDENTS[i]; return who==='k' ? x.k : who==='m' ? x.m : !x.k && (cl.w || !x.w); };
     let pool = INCIDENTS.map((x,i)=>i).filter(i=>ok(i) && !recent.has('f'+i));
     if(!pool.length) pool = INCIDENTS.map((x,i)=>i).filter(ok);
     const i = pick(pool);
@@ -858,7 +876,7 @@ function makeJob(){
   // 聲望越高，高難度（高酬勞）的委託越多；聲望低也偶爾會有三星委託
   const stars = save.rep < 20 ? pick([1,1,1,2,2,3]) : save.rep < 60 ? pick([1,2,2,3,3]) : pick([2,3,3]);
   const D = DIFF[stars];
-  const cl = pick(CLIENTS), I = pickIncident(cl), inc = I.key, lv = I.lv;
+  const cl = makeClient(), I = pickIncident(cl), inc = I.key, lv = I.lv;
   return {
     id: Math.random().toString(36).slice(2,8),
     at: Date.now() - Math.floor(rand(5, 480))*60000,   // 收到時間（幾分鐘到 8 小時前）
@@ -2074,7 +2092,7 @@ dnBoot();
 if(/[?&]debug\b/.test(location.search)){
   window.skyMap = map;
   window.nmkDebug = { get target(){ return target; }, get save(){ return save; }, ballistics:a=>ballistics(a), fire,
-    partAtLocal, CLIENTS, INCIDENTS, makeJob, incidentCount, pickIncident,
+    partAtLocal, CLIENTS, makeClient, CL_COUNT, INCIDENTS, makeJob, incidentCount, pickIncident,
     get timeLeft(){ return timeLeft; }, set timeLeft(v){ timeLeft=v; }, get state(){ return state; },
     sfx:{gunSound, boltSound, tickSound, alarmSound, stepCountdown}, get actx(){ return actx; },
     // 把行人可以走的路網畫在地圖上（檢查道路資料用）；再呼叫一次就關掉
