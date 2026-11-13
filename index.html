@@ -42,13 +42,37 @@
   .pw.dead .xmark{display:block}
   .impact{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;
        border:2px solid rgba(255,230,150,.9);animation:imp .8s ease-out forwards}
+  /* 血跡：大小以公尺計（--m = 每公尺幾像素），跟著地圖倍率縮放 */
+  .blood{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none}
+  .blood svg{position:absolute;overflow:visible;width:calc(var(--m)*var(--d)*1px);height:calc(var(--m)*var(--d)*1px);
+       left:calc(var(--m)*var(--d)*-.5px);top:calc(var(--m)*var(--d)*-.5px);transform:rotate(var(--rot));
+       animation:bloodIn var(--t,.35s) ease-out both}
+  @keyframes bloodIn{from{transform:rotate(var(--rot)) scale(.15);opacity:.3}to{transform:rotate(var(--rot)) scale(1);opacity:1}}
+  .spray{position:absolute;left:0;top:0;pointer-events:none;transform:rotate(var(--rot))}
+  .spray i{position:absolute;border-radius:50%;background:#c00010;width:calc(var(--m)*var(--sz)*1px);height:calc(var(--m)*var(--sz)*1px);
+       margin:calc(var(--m)*var(--sz)*-.5px) 0 0 calc(var(--m)*var(--sz)*-.5px);box-shadow:0 0 2px rgba(80,0,0,.8);
+       animation:spray .55s cubic-bezier(.15,.7,.3,1) forwards}
+  @keyframes spray{from{transform:translate(0,0) scale(1.3);opacity:1}
+       to{transform:translate(calc(var(--m)*var(--dx)*1px),calc(var(--m)*var(--dy)*1px)) scale(.6);opacity:0}}
   @keyframes imp{from{transform:scale(.2);opacity:1}to{transform:scale(1.6);opacity:0}}
 
   /* 瞄準鏡 */
-  #scope{position:fixed;inset:0;pointer-events:none;z-index:500;opacity:0;transition:opacity .25s;
-       background:radial-gradient(circle at center,transparent 0,transparent 40vmin,rgba(0,0,0,.88) 40.5vmin)}
-  #scope.on{opacity:1}
-  #cross{position:fixed;left:50%;top:50%;width:240px;height:240px;margin:-120px 0 0 -120px;pointer-events:none;z-index:510}
+  /* 狙擊鏡（×19 以上）：鏡筒外全黑、鏡片邊緣暗角與內陰影、淡淡的鍍膜反光；整支鏡會跟著呼吸晃動
+     #scope 比畫面大一圈，晃動時邊緣才不會露出來 */
+  #scope{--lr:44vmin;position:fixed;inset:-20vmin;pointer-events:none;z-index:500;opacity:0;visibility:hidden;
+       background:radial-gradient(circle at center,transparent 0,transparent calc(var(--lr) - 3vmin),rgba(0,0,0,.45) calc(var(--lr) - 1.2vmin),#000 var(--lr))}
+  #scope::before{content:"";position:absolute;left:50%;top:50%;width:calc(var(--lr)*2);height:calc(var(--lr)*2);
+       margin:calc(var(--lr)*-1) 0 0 calc(var(--lr)*-1);border-radius:50%;
+       background:radial-gradient(ellipse 60% 38% at 32% 22%,rgba(190,225,255,.10),transparent 70%),
+                  radial-gradient(circle at 70% 80%,rgba(120,160,255,.05),transparent 45%),
+                  radial-gradient(circle at center,rgba(40,70,60,.06),rgba(0,0,0,.18) 92%);
+       box-shadow:inset 0 0 5vmin 1vmin rgba(0,0,0,.7),inset 0 0 0 .35vmin rgba(0,0,0,.95)}
+  #scope::after{content:"";position:absolute;left:50%;top:50%;width:calc(var(--lr)*2 + 1.6vmin);height:calc(var(--lr)*2 + 1.6vmin);
+       margin:calc(var(--lr)*-1 - .8vmin) 0 0 calc(var(--lr)*-1 - .8vmin);border-radius:50%;
+       border:.8vmin solid #070707;box-shadow:0 0 0 1px rgba(255,255,255,.06),inset 0 0 0 1px rgba(255,255,255,.08)}
+  #scope.on{opacity:1;visibility:visible;animation:scopeIn .3s ease-out}
+  @keyframes scopeIn{from{opacity:0;filter:blur(6px)}to{opacity:1;filter:none}}
+  #cross{position:fixed;left:50%;top:50%;width:240px;height:240px;margin:-120px 0 0 -120px;pointer-events:none;z-index:510;overflow:visible}
   #rangetag{position:fixed;z-index:600;left:50%;top:calc(50% + 128px);transform:translateX(-50%);font-size:13px;color:#ffe9a8;
        text-shadow:0 0 3px #000,0 0 3px #000;pointer-events:none;white-space:nowrap;text-align:center;line-height:1.5}
   #rangetag .arw{display:inline-block;color:#7fd8ff}
@@ -710,9 +734,9 @@ function incidentCount(){
 }
 const DIFF = [   // 難度 1~3 星；decoys = 衣裝和噁男部分相同的誘餌
   null,
-  {time:210, peds:60,  decoys:6,  windMax:4,  pay:[2500,4000]},
-  {time:180, peds:85,  decoys:10, windMax:7,  pay:[4500,6500]},
-  {time:150, peds:110, decoys:16, windMax:10, pay:[7000,9500]},
+  {time:180, peds:60,  decoys:6,  windMax:4,  pay:[2500,4000]},
+  {time:150, peds:85,  decoys:10, windMax:7,  pay:[4500,6500]},
+  {time:120, peds:110, decoys:16, windMax:10, pay:[7000,9500]},
 ];
 /* 委託條件：依序要命中的部位。任何部位、任何順序、可重複，也可以先打死再繼續打（鞭屍）。
    全部依序命中、而且噁男最後是死的，才算完全達成。 */
@@ -937,7 +961,9 @@ function metersPerPx(){ return 156543.03392*Math.cos(LAT0*Math.PI/180)/Math.pow(
 function drawReticle(){
   const mpp = metersPerPx();
   tickStep = [0.1,0.2,0.5,1,2,5,10,20,50,100].find(s=>s/mpp>=12) || 100;
-  const px = tickStep/mpp, C=120;
+  const px = tickStep/mpp;
+  if($('scope').classList.contains('on')) return drawScopeReticle(px);
+  const C=120; setCrossSize(C);
   let s = `<g stroke="#ff2b2b" stroke-width="1.5" fill="none" opacity=".95">
     <circle cx="${C}" cy="${C}" r="10"/>
     <line x1="${C}" y1="0" x2="${C}" y2="${C-14}"/><line x1="${C}" y1="${C+14}" x2="${C}" y2="240"/>
@@ -951,6 +977,31 @@ function drawReticle(){
     <text x="236" y="${C-8}" fill="#ffb3b3" font-size="10" text-anchor="end" font-family="Consolas,monospace">1格=${tickStep}m</text>`;
   $('cross').innerHTML = s;
 }
+function setCrossSize(C){ const c=$('cross'); c.setAttribute('viewBox',`0 0 ${C*2} ${C*2}`); c.style.width=c.style.height=C*2+'px'; c.style.margin=`-${C}px 0 0 -${C}px`; }
+/* 狙擊鏡十字線（雙粗線＋密位點）：細線貫穿整個鏡片，外圈是粗黑柱；刻度點的間距 = 1 格（公尺數依倍率變化）；中心紅點發光 */
+function drawScopeReticle(px){
+  const C = Math.round(Math.min(innerWidth, innerHeight)*0.44), inner = Math.round(C*0.55);
+  setCrossSize(C);
+  const halo = 'rgba(255,255,255,.28)', ink = '#050505';
+  const ln = (x1,y1,x2,y2,w) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${halo}" stroke-width="${w+1.6}"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${ink}" stroke-width="${w}"/>`;
+  let s = '<g stroke-linecap="butt">';
+  // 細十字線（中心留一點空隙，看得到目標）
+  s += ln(C, C-inner, C, C-6, 1.2) + ln(C, C+6, C, C+inner, 1.2) + ln(C-inner, C, C-6, C, 1.2) + ln(C+6, C, C+inner, C, 1.2);
+  // 外圈粗柱
+  s += ln(C, 0, C, C-inner, 6) + ln(C, C+inner, C, C*2, 6) + ln(0, C, C-inner, C, 6) + ln(C+inner, C, C*2, C, 6);
+  // 密位點：每格一點，每 5 格畫短橫線
+  for(let i=1; i*px<=inner-4; i++){
+    const d=i*px;
+    if(i%5===0){ const L=6; s += ln(C+d,C-L,C+d,C+L,1.2)+ln(C-d,C-L,C-d,C+L,1.2)+ln(C-L,C+d,C+L,C+d,1.2)+ln(C-L,C-d,C+L,C-d,1.2); }
+    else for(const [x,y] of [[C+d,C],[C-d,C],[C,C+d],[C,C-d]]) s += `<circle cx="${x}" cy="${y}" r="2.6" fill="${halo}"/><circle cx="${x}" cy="${y}" r="1.7" fill="${ink}"/>`;
+  }
+  s += '</g>';
+  // 中心發光紅點
+  s += `<circle cx="${C}" cy="${C}" r="5" fill="rgba(255,40,40,.25)"/><circle cx="${C}" cy="${C}" r="1.8" fill="#ff3030" style="filter:drop-shadow(0 0 2px #ff2020)"/>`;
+  s += `<text x="${C+inner-2}" y="${C+16}" fill="rgba(235,235,235,.75)" font-size="11" text-anchor="end" font-family="Consolas,monospace" style="paint-order:stroke;stroke:#000;stroke-width:2px">1格=${tickStep}m</text>`;
+  $('cross').innerHTML = s;
+}
+addEventListener('resize', ()=>{ if(typeof map!=='undefined') drawReticle(); });
 
 /* ---------- 狙擊位置、距離、風 ---------- */
 let shooter = null, shooterMk = null, aimLine = null;
@@ -1252,6 +1303,41 @@ function addWound(p, x, y){
   w.setAttribute('cx', x); w.setAttribute('cy', -y); w.setAttribute('r', 0.035); w.setAttribute('class','wound');
   g.appendChild(w);
 }
+/* ---------- 血跡 ----------
+   擊中時沿子彈方向噴出血花（短暫動畫），地上留下血跡（整局保留）；倒地爬行時一路滴血 */
+let bloodMarks = [];
+const BLOOD_MAX = 160;
+function bloodSVG(n, stretch){   // 不規則血泊：一團主血跡＋往子彈方向甩出去的小點
+  let c = `<circle cx="0" cy="0" r=".42" fill="#5c0008"/>`;
+  for(let i=0;i<n;i++){
+    const a = rand(-0.9,0.9) + (Math.random()<0.25 ? Math.PI : 0), r = rand(.15, .5+stretch*.5);
+    c += `<ellipse cx="${(Math.sin(a)*r).toFixed(2)}" cy="${(-Math.cos(a)*r).toFixed(2)}" rx="${rand(.05,.2).toFixed(2)}" ry="${rand(.05,.28).toFixed(2)}" fill="#7a000c" transform="rotate(${(a*57.3).toFixed(0)} ${(Math.sin(a)*r).toFixed(2)} ${(-Math.cos(a)*r).toFixed(2)})"/>`;
+  }
+  c += `<circle cx="0" cy="0" r=".26" fill="#3d0005"/>`;
+  return `<svg viewBox="-1 -1 2 2" style="opacity:.9">${c}</svg>`;
+}
+function addBlood(ll, d, rot, n, stretch, t){
+  const m = L.marker(ll, {interactive:false, keyboard:false, zIndexOffset:-20000,
+    icon:L.divIcon({className:'pedicon', iconSize:[0,0],
+      html:`<div class="blood" style="--d:${d.toFixed(2)};--rot:${rot.toFixed(2)}rad;--t:${t||.35}s">${bloodSVG(n, stretch)}</div>`})}).addTo(map);
+  bloodMarks.push(m);
+  if(bloodMarks.length>BLOOD_MAX) map.removeLayer(bloodMarks.shift());
+}
+function bloodHit(p, lethal){   // 擊中：噴血花＋地上血跡（致命傷的血泊比較大，會慢慢擴散）
+  const v = vec(shooter, p.ll), rot = Math.atan2(v[0], v[1]);   // 子彈前進方向（0 = 北，順時針）
+  let drops = '';
+  for(let i=0;i<14;i++){
+    const a = rand(-0.6,0.6), r = rand(0.5, 1.8);
+    drops += `<i style="--sz:${rand(.05,.14).toFixed(2)};--dx:${(Math.sin(a)*r).toFixed(2)};--dy:${(-Math.cos(a)*r).toFixed(2)};animation-delay:${rand(0,.06).toFixed(2)}s"></i>`;
+  }
+  const sp = L.marker(p.ll, {interactive:false, keyboard:false, zIndexOffset:20000,
+    icon:L.divIcon({className:'pedicon', iconSize:[0,0], html:`<div class="spray" style="--rot:${rot.toFixed(2)}rad">${drops}</div>`})}).addTo(map);
+  setTimeout(()=>map.removeLayer(sp), 700);
+  // 噴到後方地上的血跡
+  const back = [p.ll[0] + Math.cos(rot)*0.7/MLAT, p.ll[1] + Math.sin(rot)*0.7/MLNG];
+  setTimeout(()=>{ if(state!=='idle') addBlood(back, rand(.7,1.0), rot, 9, 1, .25); }, 120);
+  addBlood(p.ll, lethal ? 1.7 : 0.9, rot, lethal ? 8 : 5, 0, lethal ? 3 : .5);
+}
 function lerp(p){ const k=p.t/p.len; return [p.a.ll[0]+(p.b.ll[0]-p.a.ll[0])*k, p.a.ll[1]+(p.b.ll[1]-p.a.ll[1])*k]; }
 function nextEdge(p){
   const from=p.b; let opts=from.adj.filter(n=>n!==p.a);
@@ -1262,6 +1348,7 @@ function nextEdge(p){
 
 function setupRound(){
   peds.forEach(p=>map.removeLayer(p.m)); peds=[];
+  bloodMarks.forEach(m=>map.removeLayer(m)); bloodMarks=[];
   const D = DIFF[job.stars], T = job.o;
   target = spawnPed(T, true, job.body);
   // 現場沒有人和噁男的帽子＋上衣完全一樣（沒有撞衫）。誘餌：同上衣不同帽子／同帽子不同上衣
@@ -1322,6 +1409,7 @@ function frame(now){
       if(!p.alive) continue;
       if(p.down){   // 被打中非致命部位：倒地後沿著道路緩慢爬行，不會逃跑
         let d=CRAWL_V*dt;
+        p.drip=(p.drip||0)+d; if(p.drip>0.5){ p.drip=0; addBlood(p.ll, rand(.25,.45), rand(0,6.28), 3, 0); }
         while(d>0){ const rem=p.len-p.t; if(d<rem){p.t+=d; d=0;} else {d-=rem; nextEdge(p); p.wait=0;} }
         p.ll=lerp(p); p.m.setLatLng(p.ll); continue;
       }
@@ -1372,7 +1460,8 @@ function stepSway(dt, t){
   const amp = dist*0.00005*U('bipod')*k;   // 600 m 約 ±3 cm
   sway = [amp*Math.sin(t*1.3)+amp*0.35*Math.sin(t*3.7), amp*0.75*Math.cos(t*0.9)+amp*0.3*Math.sin(t*2.9)];
   const mpp = metersPerPx();
-  $('cross').style.transform = `translate(${(sway[0]/mpp).toFixed(1)}px,${(-sway[1]/mpp).toFixed(1)}px)`;
+  const tf = `translate(${(sway[0]/mpp).toFixed(1)}px,${(-sway[1]/mpp).toFixed(1)}px)`;
+  $('cross').style.transform = tf; $('scope').style.transform = tf;   // 整支鏡（鏡片＋十字線）一起晃
   $('breath').classList.toggle('on', holding || breath<1);
   $('breath').firstChild.style.width = (breath*100)+'%';
   $('breath').firstChild.style.background = breathLock>0 ? 'var(--warn)' : '#7fd8ff';
@@ -1451,13 +1540,14 @@ function resolveShot(aim, aimed, ammoKey){
   // 破片彈：落點附近的路人被波及
   if(A.splash){
     for(const p of peds) if(p.alive && !p.isTarget && p!==best && meters(aim,p.ll)<=A.splash){
-      p.alive=false; p.root.classList.add('dead'); civKills++;
+      p.alive=false; p.root.classList.add('dead'); civKills++; bloodHit(p, true);
       log(`破片波及路人（${p.shirt.n}上衣）！酬勞 -${CIV_PAY_CUT*100}%、聲望 -${CIV_REP}`, 'var(--warn)');
     }
   }
 
   if(hit){
     addWound(best, hit.x, hit.y);
+    bloodHit(best, A.nonlethal ? false : A.allLethal ? true : hit.part.lethal);
     if(best.isTarget){
       const st = job.req.steps, part = hit.part;
       let note = '';
