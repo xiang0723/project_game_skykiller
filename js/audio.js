@@ -3,7 +3,7 @@
    槍聲 = 超音速彈頭的「啪」+ 槍口爆音的低頻衝擊 + 寬頻爆炸噪音 + 街道建築的回音殘響。
    消音器 / 亞音速彈會讓槍聲變悶變小。開槍後依槍機速度播放拉栓上膛聲。
    SFX_CFG 是各類音效的音量倍率，sfx-test.html 可以即時調整並匯出。 */
-const SFX_CFG = { master:1, reverb:0.55, gun:1, bolt:1, tick:1, alarm:1 };
+const SFX_CFG = { master:1, reverb:0.55, gun:1, bolt:1, tick:1, alarm:1, shop:1 };
 let VK = 1;   // 目前這個音效的音量倍率（各音效函式開頭設定）
 let actx=null, sfxMaster=null, sfxVerb=null, sfxGain=null, sfxVerbGain=null, muted=false;
 try{ muted = localStorage.getItem('nmk_mute')==='1'; }catch(e){}
@@ -100,6 +100,24 @@ function tickSound(urgency){
 function alarmSound(){
   if(muted) return; VK=SFX_CFG.alarm;
   try{ const a=audio(), t=a.currentTime; for(let i=0;i<3;i++) tone(t+i*0.17, 0.11, 'square', 2000, 2000, 0.16); }catch(e){}
+}
+// 購買：收銀機「喀—鏘」（抽屜彈出＋兩聲亮鈴＋硬幣叮噹）
+function buySound(){
+  if(muted) return; VK=SFX_CFG.shop;
+  try{
+    const a=audio(), t=a.currentTime;
+    nz(t, 0.05, 'lowpass', 900, 1, 0.35, 2);                         // 抽屜「喀」
+    nz(t+0.02, 0.03, 'bandpass', 2600, 4, 0.2, 3);
+    tone(t+0.06, 0.55, 'sine', 2637, 2630, 0.12);                     // 鈴「鏘」：兩個高音疊在一起
+    tone(t+0.06, 0.45, 'sine', 3951, 3940, 0.07);
+    tone(t+0.06, 0.25, 'triangle', 5274, 5260, 0.03);
+    for(let i=0;i<4;i++) tone(t+0.16+i*0.055+Math.random()*0.02, 0.06, 'sine', 5200+Math.random()*1400, 5000, 0.035);   // 硬幣叮噹
+  }catch(e){}
+}
+// 錢不夠：低沉的兩聲「嗶嗶」
+function denySound(){
+  if(muted) return; VK=SFX_CFG.shop;
+  try{ const a=audio(), t=a.currentTime; tone(t, 0.12, 'square', 220, 200, 0.1); tone(t+0.16, 0.16, 'square', 180, 160, 0.1); }catch(e){}
 }
 // 靜音開關（和遊戲的 M 鍵是同一個設定，存在 localStorage）
 const Sound = {

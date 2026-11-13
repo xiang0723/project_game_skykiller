@@ -54,6 +54,17 @@
        animation:spray .55s cubic-bezier(.15,.7,.3,1) forwards}
   @keyframes spray{from{transform:translate(0,0) scale(1.3);opacity:1}
        to{transform:translate(calc(var(--m)*var(--dx)*1px),calc(var(--m)*var(--dy)*1px)) scale(.6);opacity:0}}
+  /* 購買回饋：按鈕旁飄出扣款數字、資金數字往下跑並閃紅 */
+  .payfly{position:fixed;z-index:1200;pointer-events:none;font-weight:bold;font-size:15px;color:#ff5c7a;
+       text-shadow:0 0 4px #000,0 0 8px rgba(255,60,90,.6);white-space:nowrap;transform:translate(-50%,-50%);animation:payfly 1.1s ease-out forwards}
+  .payfly.deny{color:#ffb74d;text-shadow:0 0 4px #000}
+  @keyframes payfly{0%{opacity:0;transform:translate(-50%,-30%) scale(.7)}15%{opacity:1;transform:translate(-50%,-60%) scale(1.15)}
+       100%{opacity:0;transform:translate(-50%,-260%) scale(1)}}
+  #sMoney.spend{color:#ff5c7a;animation:moneyHit .45s ease-out}
+  @keyframes moneyHit{0%{transform:scale(1.35)}40%{transform:scale(.95)}100%{transform:scale(1)}}
+  #sMoney{display:inline-block;transition:color .4s}
+  .shake{animation:shake .35s}
+  @keyframes shake{20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
   @keyframes imp{from{transform:scale(.2);opacity:1}to{transform:scale(1.6);opacity:0}}
 
   /* 瞄準鏡 */
@@ -385,6 +396,7 @@
       <ul>
         <li>完美達成委託 +5～15，失敗 -3，每誤傷一個路人 -10。聲望可以是負的</li>
         <li><b>小費</b>：完成委託時額外拿到 聲望 × 10（聲望是負的就沒有小費）</li>
+        <li><b>學生委託</b>：國小、國高中、大學生、研究生沒什麼錢，酬勞很少，也沒有小費和時間獎金；有些甚至是<b>免費委託</b>，但完成後聲望加 3 倍</li>
         <li><b>售價</b>：彈藥與裝備升級都減去 聲望 × 10；聲望是負的就會變貴。最低是原價的 10%</li>
         <li>聲望越高，越常收到高難度、高酬勞的 ★★★ 委託</li>
       </ul>
@@ -420,7 +432,7 @@
 </div>
 
 <script src="data/incidents.js"></script>
-<script src="js/audio.js"></script>
+<script src="js/audio.js?v=0.3.2"></script>   <!-- 改 audio.js 時一併改版本號，避免瀏覽器用到舊的快取 -->
 <script>
 (() => {
 'use strict';
@@ -623,8 +635,8 @@ const money = n => 'NT$ ' + Math.round(n).toLocaleString('en-US');
 const CLIENTS = [
   {n:'妞妞．國小五年級',kid:1},{n:'匿名．國小六年級',kid:1},{n:'小米．國小四年級',kid:1},{n:'安安．國小六年級',kid:1},
   {n:'小柔．國一學生',minor:1},{n:'匿名．國二學生',minor:1},
-  {n:'小雨．上班族'},{n:'Y．大學生'},{n:'阿綾．超商店員'},{n:'M．護理師'},{n:'Lin．咖啡店員'},{n:'匿名．夜班櫃檯'},
-  {n:'芸．研究生'},{n:'Ivy．健身教練'},{n:'匿名．外送員'},{n:'小鹿．實習生'},{n:'匿名．房屋仲介'},{n:'Mia．空服員'},
+  {n:'小雨．上班族'},{n:'Y．大學生',stu:1},{n:'阿綾．超商店員'},{n:'M．護理師'},{n:'Lin．咖啡店員'},{n:'匿名．夜班櫃檯'},
+  {n:'芸．研究生',stu:1},{n:'Ivy．健身教練'},{n:'匿名．外送員'},{n:'小鹿．實習生'},{n:'匿名．房屋仲介'},{n:'Mia．空服員'},
   {n:'匿名．單親媽媽'},{n:'阿真．夜市攤販'},{n:'匿名．社工'},{n:'Hana．美髮師'},{n:'匿名．研究助理'},{n:'小安．銀行行員'},
   {n:'匿名．高二女生',minor:1},{n:'小晴．補習班學生',minor:1},{n:'匿名．高職女生',minor:1},{n:'芊．國三學生',minor:1},
   {n:'匿名．高一女生',minor:1},{n:'Momo．高三學生',minor:1},
@@ -781,9 +793,21 @@ function makeJob(){
     o: randOutfit(true),
     body: randBody(),
     req: makeReq(stars),
-    pay: Math.round((rand(D.pay[0], D.pay[1]) + SEV_BONUS[lv])/100)*100,
+    ...studentPay(cl, Math.round((rand(D.pay[0], D.pay[1]) + SEV_BONUS[lv])/100)*100),
   };
 }
+/* 學生委託人（國小、國高中、大學生、研究生）沒什麼錢：酬勞很少，或乾脆是免費委託。
+   免費委託完成時聲望加更多（×3）；學生付不起小費，也沒有時間獎金 */
+const FREE_REP_X = 3;
+function studentPay(cl, pay){
+  const stu = !!(cl.kid || cl.minor || cl.stu);
+  if(!stu) return {pay, stu:false, free:false};
+  const freeP = cl.kid ? 0.6 : cl.minor ? 0.45 : 0.25;
+  if(Math.random() < freeP) return {pay:0, stu:true, free:true};
+  const k = cl.kid ? rand(.06,.12) : cl.minor ? rand(.1,.2) : rand(.15,.3);
+  return {pay: Math.max(100, Math.round(pay*k/100)*100), stu:true, free:false};
+}
+const payLabel = j => j.free ? '免費委託（聲望 ×3）' : j.stu ? `酬勞 ${money(j.pay)}（學生）` : `酬勞 ${money(j.pay)}`;
 const JOB_COUNT = 6;
 const REFRESH_COST = 50;   // 刷新委託的費用
 function refreshJobs(){ jobs = []; for(let i=0;i<JOB_COUNT;i++) jobs.push(makeJob()); }
@@ -898,7 +922,8 @@ const map = L.map('map', {
   scrollWheelZoom:'center', doubleClickZoom:'center', touchZoom:'center',
   minZoom:15, maxZoom:24, zoomSnap:1, inertia:true, keyboard:false,
 });
-// 底圖：內政部國土測繪中心正射影像（WMTS，政府資料開放授權）。原生解析度到 ×20，比 Esri 清楚、陰影較淺
+// 底圖：內政部國土測繪中心「臺灣通用電子地圖正射影像」PHOTO2（WMTS 免申請服務，依「國土測繪圖資服務雲使用條款」：
+//   須標示來源、不得大量下載、不得移除或遮蔽圖上的浮水印與版權標示）。原生解析度到 ×20，比 Esri 清楚、陰影較淺
 L.tileLayer('https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}', {
   maxNativeZoom:20, maxZoom:24,   // ×21 以上是數位放大（空照會變糊，但人物是向量圖，仍然清楚）
   attribution:'正射影像 &copy; 內政部國土測繪中心｜道路 &copy; OpenStreetMap 貢獻者',
@@ -1253,7 +1278,7 @@ function renderReq(){
   }).join(' → ') + `</div>` +
   `<div style="margin-top:4px">${next ? `下一槍：<b style="color:#ffd54a">${next}</b>` : '<b style="color:var(--accent)">指定部位全部完成</b>'}`+
   `${target && !target.alive ? '　<span style="color:var(--warn)">（噁男已死，可以鞭屍）</span>' : target && target.down ? '　<span style="opacity:.8">（噁男倒地）</span>' : ''}</div>` +
-  `<div class="pay"><span>完成度 ${covered}/${st.length}</span><span>目前可領 <b style="color:${pct>=100?'var(--accent)':'#ffd54a'}">${pct}%</b>${pct?`（${money(Math.round(job.pay*payRatio()/100)*100)}）`:''}</span></div>` +
+  `<div class="pay"><span>完成度 ${covered}/${st.length}</span><span>目前可領 <b style="color:${pct>=100?'var(--accent)':'#ffd54a'}">${pct}%</b>${pct && !job.free ? `（${money(Math.round(job.pay*payRatio()/100)*100)}）` : ''}</span></div>` +
   `<div class="bar"><i style="width:${pct}%;${seqOk?'':'background:#ffb74d'}"></i></div>` +
   (seqOk ? '' : '<div style="color:#ffb74d;margin-top:3px">順序已亂：最多只能領 80%</div>');
   $('miniReq').innerHTML = `${next ? `下一槍 <b style="color:#ffd54a">▶${next}</b>` : '<b style="color:var(--accent)">✔ 部位全中</b>'}`+
@@ -1366,7 +1391,7 @@ function setupRound(){
   // 檔案
   $('dPv').innerHTML = outfitFig(T, job.body, 26);
   $('dTxt').innerHTML = `帽子：<b>${T.hat.n}</b><br>上衣：<b>${T.shirt.n}</b>`;
-  $('dJob').textContent = `委託人：${job.client}｜${'★'.repeat(job.stars)}｜${money(job.pay)}`;
+  $('dJob').textContent = `委託人：${job.client}｜${'★'.repeat(job.stars)}｜${job.free ? '免費委託' : money(job.pay)}`;
   curAmmo = AMMO_KEYS.find(k=>carry[k]>0) || 'std';
   tickAcc=0; warned30=false; clearLog();
   timeLeft=D.time; shotsFired=0; civKills=0; reloading=false; pending=0; breath=1; holding=false; breathLock=0;
@@ -1628,7 +1653,7 @@ function renderJobs(){
         <span>出沒：<b>台北市${DISTRICTS[j.district].name}</b></span>
         <span class="feat">${outfitFig(j.o, j.body, 15)}<span>特徵：${outfitText(j.o)}</span></span>
         <span>時限 ${mmss(D.time)}．人潮 ${D.peds}．風速最高 ${D.windMax} m/s</span>
-        <span class="pay">酬勞 ${money(j.pay)}</span>
+        <span class="pay">${payLabel(j)}</span>
       </div>
       <button data-job="${j.id}" ${canGo?'':'disabled'}>接案</button>
     </div>`;
@@ -1672,7 +1697,7 @@ function openLoadout(j){
 }
 function renderLoadout(){
   const j = pendingJob;
-  $('loadJob').innerHTML = `委託人：${j.client}｜台北市${DISTRICTS[j.district].name}｜${'★'.repeat(j.stars)}｜酬勞 ${money(j.pay)}<br>`+
+  $('loadJob').innerHTML = `委託人：${j.client}｜台北市${DISTRICTS[j.district].name}｜${'★'.repeat(j.stars)}｜${payLabel(j)}<br>`+
     `噁男：${outfitText(j.o)}<br>要求：<b style="color:#ff8fa3">${reqChain(j.req.steps)}</b>`+
     `<br><span style="opacity:.7">風速最高 ${DIFF[j.stars].windMax} m/s．人潮 ${DIFF[j.stars].peds}</span>`;
   const cap = carryCap(), tot = loadTotal();
@@ -1689,21 +1714,55 @@ function showTab(name){
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===name));
   document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('hidden', p.id!=='tab-'+name));
 }
+/* ---------- 購買回饋 ----------
+   扣款數字從按鈕飄起、資金數字從舊值跑到新值並閃紅，搭配收銀機音效；錢不夠時按鈕抖一下＋低沉嗶聲 */
+let moneyAnim = 0;
+function flyText(el, txt, cls=''){
+  const r = el.getBoundingClientRect(), d = document.createElement('div');
+  d.className = 'payfly ' + cls; d.textContent = txt;
+  d.style.left = (r.left + r.width/2) + 'px'; d.style.top = (r.top + r.height/2) + 'px';
+  document.body.appendChild(d); setTimeout(()=>d.remove(), 1150);
+}
+function payFx(btn, from, cost){
+  buySound();
+  if(btn) flyText(btn, '-' + money(cost));
+  const m = $('sMoney'); if(!m) return;
+  flyText(m, '-' + money(cost));
+  m.classList.remove('spend'); void m.offsetWidth; m.classList.add('spend');
+  const to = save.money, t0 = performance.now(), id = ++moneyAnim;
+  const step = now => {
+    if(id !== moneyAnim) return;
+    const k = Math.min(1, (now - t0) / 600), e = 1 - Math.pow(1 - k, 3);
+    m.textContent = money(Math.round(from + (to - from) * e));
+    if(k < 1) requestAnimationFrame(step); else setTimeout(()=>m.classList.remove('spend'), 300);
+  };
+  requestAnimationFrame(step);
+}
+function denyFx(btn){ denySound(); if(btn){ btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake'); flyText(btn, '資金不足', 'deny'); } }
+// 先扣款、重繪畫面，再對重繪後同一個位置的按鈕播回饋（重繪會換掉按鈕元素）
+function spend(cost, btn, after){
+  const from = save.money, r = btn.getBoundingClientRect();
+  save.money -= cost; persist(); after();
+  const ghost = {getBoundingClientRect:()=>r};
+  payFx(ghost, from, cost);
+}
 $('startBox').addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b || b.disabled) return;
   if(b.dataset.tab){ renderTerminal(); showTab(b.dataset.tab); }
   else if(b.dataset.job){ const j=jobs.find(x=>x.id===b.dataset.job); if(j) openLoadout(j); }
   else if(b.dataset.buy){ const [k,n]=b.dataset.buy.split(':'), cost=priceOf(AMMO_TYPES[k].price)*(+n);
-    if(save.money>=cost){ save.money-=cost; save.ammo[k]=(save.ammo[k]||0)+(+n); persist(); renderTerminal(); } }
+    if(save.money>=cost) spend(cost, b, ()=>{ save.ammo[k]=(save.ammo[k]||0)+(+n); persist(); renderTerminal(); });
+    else denyFx(b); }
   else if(b.dataset.load){ const [k,d]=b.dataset.load.split(':'); loadSel[k]=Math.max(0,(loadSel[k]||0)+(+d)); renderLoadout(); }
   else if(b.id==='loadGo'){ if(loadTotal()>0 && loadTotal()<=carryCap()){ save.lastLoad={...loadSel}; persist(); startGame(pendingJob, {...loadSel}); } }
   else if(b.id==='loadBack'){ showTab('jobs'); }
   else if(b.dataset.up){ const k=b.dataset.up, u=UPGRADES[k], lv=save.up[k];
     const c=priceOf(u.cost[lv]||0);
-    if(lv<u.vals.length-1 && save.money>=c){ save.money-=c; save.up[k]++; persist(); renderTerminal(); } }
+    if(lv<u.vals.length-1 && save.money>=c) spend(c, b, ()=>{ save.up[k]++; persist(); renderTerminal(); });
+    else if(lv<u.vals.length-1) denyFx(b); }
   else if(b.id==='refreshJobs'){   // 每次刷新扣 NT$ 50
-    if(save.money<REFRESH_COST){ showDialog({title:'錢不夠', msg:`刷新委託要 ${money(REFRESH_COST)}，你現在只有 ${money(save.money)}。`, ok:'知道了'}); return; }
-    save.money-=REFRESH_COST; persist(); refreshJobs(); renderTerminal(); }
+    if(save.money<REFRESH_COST){ denyFx(b); showDialog({title:'錢不夠', msg:`刷新委託要 ${money(REFRESH_COST)}，你現在只有 ${money(save.money)}。`, ok:'知道了'}); return; }
+    spend(REFRESH_COST, b, ()=>{ refreshJobs(); renderTerminal(); }); }
   else if(b.id==='resetSave'){
     showDialog({title:'清除存檔？', msg:'資金、彈藥、裝備、聲望都會重置，而且無法復原。', ok:'清除存檔', cancel:'取消', danger:true})
       .then(yes=>{ if(yes){ save=NEW_SAVE(); persist(); refreshJobs(); renderTerminal(); showTab('jobs'); } });
@@ -1784,6 +1843,8 @@ async function startGame(j, load){
 }
 const THANKS = ['謝謝你……我終於可以安心走回家了。','我不知道該說什麼，只能說謝謝。','今天是這幾個月來，第一次不用回頭看。',
   '錢不多，但這是我打工存下來的，謝謝你。','我妹妹終於敢再去上學了。','希望再也不會有人遇到他。'];
+const THANKS_STU = ['這是我存了好久的零用錢，不多，對不起……謝謝你。','我把打工的錢都拿出來了，謝謝你願意接。','錢很少，但我真的很感謝你。'];
+const THANKS_FREE = ['我沒有錢……但我會一輩子記得你。','謝謝你願意幫一個付不起錢的學生。','我終於敢一個人走路上學了。謝謝你，真的。','媽媽問我最近怎麼比較會笑了。'];
 function endGame(win, reason){
   state='over'; updHud(); updRange();
   if(reconLayer){ map.removeLayer(reconLayer); reconLayer=null; }
@@ -1799,18 +1860,18 @@ function endGame(win, reason){
     const steps = job.req.steps, full = perfect();
     const ratio = payRatio();
     const base = Math.round(job.pay*ratio/100)*100;
-    const bonus = full ? Math.round(t*5/100)*100 : 0;   // 剩餘每秒 NT$5，只有完全達成才有
+    const bonus = full && !job.stu ? Math.round(t*5/100)*100 : 0;   // 剩餘每秒 NT$5，只有完全達成才有（學生委託沒有）
     const cut = Math.round(base*Math.min(1, civKills*CIV_PAY_CUT));
-    const tip = tipOf();   // 小費：依完成任務當下的聲望
+    const tip = job.stu ? 0 : tipOf();   // 小費：依完成任務當下的聲望（學生付不起小費）
     gain = Math.max(0, base + bonus - cut) + tip;
-    repD = (full ? 5*job.stars : covered>0 ? 2 : 0) - civKills*CIV_REP;
+    repD = (full ? 5*job.stars : covered>0 ? 2 : 0) * (job.free ? FREE_REP_X : 1) - civKills*CIV_REP;   // 免費委託聲望 ×3
     save.done++;
     const verdict = full ? '✔ 完美達成' : covered>=steps.length ? `△ 部位全中但順序不對` : covered>0 ? `△ 部分完成（${covered}/${steps.length}）` : '✘ 沒打中指定部位（只解決了噁男）';
     rows = `<tr><td>委託條件</td><td class="${full?'pos':'neg'}">${verdict}</td></tr>
-            <tr><td>委託酬勞${full?'':`（${Math.round(ratio*100)}%）`}</td><td class="pos">+${money(base)}</td></tr>
+            ${job.free ? '<tr><td>委託酬勞</td><td>免費委託（聲望 ×3）</td></tr>' : `<tr><td>委託酬勞${full?'':`（${Math.round(ratio*100)}%）`}</td><td class="pos">+${money(base)}</td></tr>`}
             ${full?`<tr><td>時間獎金（剩 ${t} 秒）</td><td class="pos">+${money(bonus)}</td></tr>`:''}
             ${civKills?`<tr><td>誤傷 ${civKills} 人</td><td class="neg">-${money(cut)}</td></tr>`:''}
-            <tr><td>小費（聲望 ${save.rep} × 10）</td><td class="${tip>0?'pos':''}">${tip>0?'+'+money(tip):'沒有小費'}</td></tr>`;
+            <tr><td>小費${job.stu ? '' : `（聲望 ${save.rep} × 10）`}</td><td class="${tip>0?'pos':''}">${tip>0 ? '+'+money(tip) : job.stu ? '學生付不起小費' : '沒有小費'}</td></tr>`;
   }else{
     repD = -3 - civKills*CIV_REP;
     rows = `<tr><td>${reason}</td><td class="neg">沒有酬勞</td></tr>`;
@@ -1823,7 +1884,7 @@ function endGame(win, reason){
       <tr><td>消耗子彈</td><td>${shotsFired} 發（彈藥庫剩 ${ammoTotal()} 發）</td></tr>
       <tr><td>聲望</td><td class="${repD>=0?'pos':'neg'}">${repD>=0?'+':''}${repD}（目前 ${save.rep}）</td></tr>
       <tr><td>資金</td><td>${money(save.money)}</td></tr></table>
-    <p style="margin-top:10px;opacity:.85">${win ? `委託人 ${job.client} 留言：「${pick(THANKS)}」` : '噁男已用黃框標示。'}</p>`;
+    <p style="margin-top:10px;opacity:.85">${win ? `委託人 ${job.client} 留言：「${pick(job.free ? THANKS_FREE : job.stu ? THANKS_STU : THANKS)}」` : '噁男已用黃框標示。'}</p>`;
   setTimeout(()=>{ $('startBox').classList.add('hidden'); $('endBox').classList.remove('hidden');
     $('overlay').classList.add('endMode'); $('overlay').classList.remove('hidden'); }, win?900:1600);
 }
