@@ -282,6 +282,8 @@
   .termhead .stats{color:var(--dn-mute)} .termhead .stats b{color:var(--dn-ink);font-weight:normal}
   .termhead .addr{color:var(--dn-mute)} .termhead .addr b{color:var(--dn-ink);font-weight:normal}
   .live{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--dn-ink);box-shadow:0 0 6px var(--dn-ink);margin-right:6px;animation:bl 1.4s infinite}
+  .credit a{color:var(--dn-hi);text-decoration:underline;text-underline-offset:3px}
+  .credit a:hover{text-shadow:0 0 6px var(--dn-glow)}
   .brand{color:var(--dn-hi);letter-spacing:3px;font-weight:bold;text-shadow:0 0 6px var(--dn-glow)}
   .glitch{position:relative;display:inline-block}
   .glitch::before,.glitch::after{content:attr(data-t);position:absolute;left:0;top:0;opacity:.7}
@@ -513,6 +515,8 @@
         <li>一個指定部位都沒打到、只把他打死，只能領 10%</li>
         <li>打中過指定部位或噁男已死，就能按「收工撤離」依完成度結算</li>
       </ul>
+      <h3>製作資訊</h3>
+      <p class="credit">© 2026 <a href="https://github.com/xiang0723/project_game_skykiller" target="_blank" rel="noopener">Jax Huang</a> ・ <a href="https://creativecommons.org/licenses/by-nc/4.0/deed.zh-hant" target="_blank" rel="noopener">CC BY-NC 4.0</a> 非商業授權</p>
       <p style="font-size:12px;opacity:.55">本遊戲純屬虛構，人物與委託皆為隨機產生。<br>
         <button class="small" id="resetSave" style="margin-top:6px">清除存檔重新開始</button></p>
     </div>
@@ -622,51 +626,75 @@ function segDist(px,py,[ax,ay],[bx,by]){
   const dx=bx-ax, dy=by-ay, t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)));
   return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
 }
-function partAtLocal(x,y,tolExtra=0){
+function partAtLocal(x,y,tolExtra=0,P=PART){
   const dist = p => p.type==='c' ? Math.hypot(x-p.c[0], y-p.c[1]) - p.r : segDist(x,y,p.a,p.b) - p.w/2;
   // 先嚴格判定（真的打在部位上）；沒有的話，用放寬的範圍找最近的部位（擴張彈、破片彈）
-  for(const id of HIT_PRIORITY){ const p=PART[id]; if(dist(p)<=HIT_TOL) return p; }
+  for(const id of HIT_PRIORITY){ const p=P[id]; if(dist(p)<=HIT_TOL) return p; }
   if(tolExtra>0){
     let best=null, bd=Infinity;
-    for(const p of PARTS){ const d=dist(p); if(d<bd){ bd=d; best=p; } }
+    for(const p of Object.values(P)){ const d=dist(p); if(d<bd){ bd=d; best=p; } }
     if(bd<=HIT_TOL+tolExtra) return best;
   }
   return null;
 }
-/* 可以擺動的肢體：每組繞自己的關節（基準尺寸、y 朝前）轉 */
-const LIMBS = {
-  ll:{parts:['lfoot','lcalf','lthigh','lknee'], pv:[-0.12,-0.17]},   // 左腿：髖關節
-  rl:{parts:['rfoot','rcalf','rthigh','rknee'], pv:[ 0.12,-0.17]},
-  la:{parts:['lupper','lfore','lhand'],         pv:[-0.29, 0.24]},   // 左手：肩關節
-  ra:{parts:['rupper','rfore','rhand'],         pv:[ 0.29, 0.24]},
-  hd:{parts:['neck','head'],                    pv:[ 0.00, 0.28]},   // 頭：脖子根部
+/* ---------- 關節 ----------
+   pv = 關節位置（基準尺寸、y 朝前），up = 上一節關節（手肘跟著肩膀、膝蓋跟著髖部一起轉），
+   tip = 這一節末端大概的位置（算慣性甩動用），lim = 可以轉的範圍（度，以「往外張開」為正，右側鏡像）。
+   角度存的是 SVG 的角度（y 朝下，順時針為正）：左側肢體往外張＝正，右側往外張＝負。 */
+const JOINTS = {
+  ll: {pv:[-0.12,-0.17],  tip:[-0.165,-0.49], lim:[-35, 55]},              // 左髖
+  llo:{pv:[-0.165,-0.49], tip:[-0.20,-0.94],  lim:[-120,120], up:'ll'},    // 左膝
+  rl: {pv:[ 0.12,-0.17],  tip:[ 0.165,-0.49], lim:[-35, 55]},
+  rlo:{pv:[ 0.165,-0.49], tip:[ 0.20,-0.94],  lim:[-120,120], up:'rl'},
+  la: {pv:[-0.29, 0.24],  tip:[-0.405,0.00],  lim:[-45,165]},              // 左肩
+  lfa:{pv:[-0.405,0.005], tip:[-0.49,-0.25],  lim:[-145, 70], up:'la'},    // 左手肘
+  ra: {pv:[ 0.29, 0.24],  tip:[ 0.405,0.00],  lim:[-45,165]},
+  rfa:{pv:[ 0.405,0.005], tip:[ 0.49,-0.25],  lim:[-145, 70], up:'ra'},
+  hd: {pv:[ 0.00, 0.28],  tip:[ 0.00, 0.53],  lim:[-55, 55], mid:true},    // 頭（不分左右）
 };
-const LIMB_OF = {}; for(const k in LIMBS) for(const id of LIMBS[k].parts) LIMB_OF[id]=k;
+for(const k in JOINTS) JOINTS[k].side = JOINTS[k].mid ? 0 : k[0]==='l' ? 1 : -1;
+const JOINT_OF = {lthigh:'ll', lknee:'llo', lcalf:'llo', lfoot:'llo', rthigh:'rl', rknee:'rlo', rcalf:'rlo', rfoot:'rlo',
+  lupper:'la', lfore:'lfa', lhand:'lfa', rupper:'ra', rfore:'rfa', rhand:'rfa', neck:'hd', head:'hd'};
+const rootJoint = k => { while(k && JOINTS[k].up) k=JOINTS[k].up; return k; };
 function figSVG(){
   const col = f => `var(--${f})`, Y = v => -v;   // SVG 的 y 軸向下
-  let s = '';
-  const grp = {}; for(const k in LIMBS) grp[k]='';
-  const flush = k => { if(grp[k]===null) return; s += `<g class="lm" data-lm="${k}">${grp[k]}${k==='hd'?'__HAT__':''}</g>`; grp[k]=null; };
-  for(const p of PARTS){
-    const k = LIMB_OF[p.id];
-    if(!k){ // 軀幹部位：畫之前先把排在它前面的肢體組畫出來（保持原本的前後順序）
-      if(p.id==='abdomen'){ flush('ll'); flush('rl'); }
-      if(p.id==='chest'){ flush('la'); flush('ra'); }
-    }
-    const out = k ? (x=>{ grp[k]+=x; }) : (x=>{ s+=x; });
-    // 每個部位先畫一圈深色外框，部位之間的分界才看得清楚
-    if(p.type==='s') out(`<line x1="${p.a[0]}" y1="${Y(p.a[1])}" x2="${p.b[0]}" y2="${Y(p.b[1])}" stroke="rgba(0,0,0,.55)" stroke-width="${p.w+0.025}" stroke-linecap="round"/>`+
-                          `<line x1="${p.a[0]}" y1="${Y(p.a[1])}" x2="${p.b[0]}" y2="${Y(p.b[1])}" stroke="${col(p.fill)}" stroke-width="${p.w}" stroke-linecap="round"/>`);
-    else out(`<circle cx="${p.c[0]}" cy="${Y(p.c[1])}" r="${p.r}" fill="${col(p.fill)}" stroke="rgba(0,0,0,.55)" stroke-width=".0125"/>`);
-  }
+  // 每個部位先畫一圈深色外框，部位之間的分界才看得清楚
+  const S = id => { const p=PART[id];
+    return p.type==='s'
+      ? `<line x1="${p.a[0]}" y1="${Y(p.a[1])}" x2="${p.b[0]}" y2="${Y(p.b[1])}" stroke="rgba(0,0,0,.55)" stroke-width="${p.w+0.025}" stroke-linecap="round"/>`+
+        `<line x1="${p.a[0]}" y1="${Y(p.a[1])}" x2="${p.b[0]}" y2="${Y(p.b[1])}" stroke="${col(p.fill)}" stroke-width="${p.w}" stroke-linecap="round"/>`
+      : `<circle cx="${p.c[0]}" cy="${Y(p.c[1])}" r="${p.r}" fill="${col(p.fill)}" stroke="rgba(0,0,0,.55)" stroke-width=".0125"/>`; };
+  const G = (k, inner) => `<g class="lm" data-lm="${k}">${inner}</g>`;
   // 帽子（比頭大一圈、黑色粗框，蓋住整顆頭）＋帽簷（標示面朝方向，分辨左右用）；沒戴帽的人只看到深色頭髮和鼻尖
   const hat = `<g class="hatg"><ellipse cx="0" cy="${Y(0.70)}" rx="0.12" ry="0.065" fill="var(--hat)" stroke="#000" stroke-width=".022"/>`+
        `<circle cx="0" cy="${Y(0.53)}" r="0.165" fill="var(--hat)" stroke="#000" stroke-width=".022"/></g>`+
        `<circle class="nose" cx="0" cy="${Y(0.675)}" r="0.03" fill="var(--skin)" stroke="rgba(0,0,0,.5)" stroke-width=".01"/>`;
-  for(const k in LIMBS) flush(k);   // 頭（含帽子、鼻子）最後畫
-  s = s.replace('__HAT__', hat);
+  let s = '';
+  for(const L of ['l','r']) s += G(L+'l', S(L+'thigh') + G(L+'lo', S(L+'foot')+S(L+'calf')+S(L+'knee')));   // 腿：大腿 → 小腿＋腳＋膝蓋
+  s += S('abdomen') + S('groin');
+  for(const L of ['l','r']) s += G(L+'a', S(L+'upper') + G(L+'fa', S(L+'fore')+S(L+'hand')));             // 手：上臂 → 前臂＋手掌
+  s += S('chest') + S('lshould') + S('rshould');
+  s += G('hd', S('neck') + S('head') + hat);
   s += `<g class="xmark"><line x1="-.3" y1="-.4" x2=".3" y2=".2"/><line x1=".3" y1="-.4" x2="-.3" y2=".2"/></g>`;
   return `<svg class="fig" viewBox="-1.1 -1.3 2.2 2.6"><g class="body" transform="scale(__SX__,__SY__)">${s}</g></svg>`;
+}
+/* 姿勢換算：把基準座標的點，依照關節目前的角度轉到實際位置（從這一節往上一路轉到根部） */
+function rotAbout(x, y, [px,py], deg){ const ph=-deg*Math.PI/180, c=Math.cos(ph), s=Math.sin(ph), dx=x-px, dy=y-py; return [px+dx*c-dy*s, py+dx*s+dy*c]; }
+function poseFwd(p, j, x, y){ for(let k=j; k; k=JOINTS[k].up){ const a=p.lm[k] ? p.lm[k].a : 0; if(a) [x,y]=rotAbout(x,y,JOINTS[k].pv,a); } return [x,y]; }
+function poseInv(p, j, x, y){
+  const chain=[]; for(let k=j; k; k=JOINTS[k].up) chain.unshift(k);
+  for(const k of chain){ const a=p.lm[k] ? p.lm[k].a : 0; if(a) [x,y]=rotAbout(x,y,JOINTS[k].pv,-a); }
+  return [x,y];
+}
+function posedParts(p){   // 這個人目前姿勢下的部位表（命中判定用，畫面看到的就是判定的）
+  if(!p.lm || !Object.values(p.lm).some(L=>L.a)) return PART;
+  const out = {};
+  for(const q of PARTS){
+    const j = JOINT_OF[q.id];
+    if(!j){ out[q.id]=q; continue; }
+    out[q.id] = q.type==='c' ? {...q, c:poseFwd(p,j,...q.c)} : {...q, a:poseFwd(p,j,...q.a), b:poseFwd(p,j,...q.b)};
+  }
+  return out;
 }
 const FIG_SVG = figSVG();
 
@@ -1482,7 +1510,7 @@ function spawnPed(o, isTarget, body){
   p.m = L.marker(p.ll, {icon:makeIcon(p), interactive:false, keyboard:false}).addTo(map);
   const el = p.m.getElement();
   p.root = el.firstChild; p.fig = el.querySelector('.fig');
-  p.lm = {}; for(const g of p.fig.querySelectorAll('.lm')) p.lm[g.dataset.lm] = {el:g, a:0, v:0};
+  p.lm = {}; for(const g of p.fig.querySelectorAll('.lm')) p.lm[g.dataset.lm] = {el:g, a:0, v:0, r:0};   // a 角度、v 角速度、r 姿勢（彈簧的平衡點）
   p.off=[0,0]; p.kv=[0,0]; p.spin=0; p.sv=0;
   p.fig.style.transform = `rotate(${p.hd}rad)`;
   peds.push(p); return p;
@@ -1493,11 +1521,12 @@ function hitPart(p, ll, tolExtra=0){
   // 換回基準尺寸（除以整體倍率與這個人的體型倍率，和 SVG 的 scale 完全對應）
   const x = (d[0]*c - d[1]*s)/(BODY_SCALE*p.sx), y = (d[0]*s + d[1]*c)/(BODY_SCALE*p.sy);
   if(Math.hypot(x,y) > 1.4) return null;
-  const part = partAtLocal(x,y,tolExtra);
+  const part = partAtLocal(x,y,tolExtra,posedParts(p));
   return part ? {part, x, y} : null;
 }
 function addWound(p, x, y, pid){
-  const k = LIMB_OF[pid], g = (k && p.lm[k]) ? p.lm[k].el : p.fig.querySelector('.body');   // 傷口跟著那一節肢體擺動
+  const k = JOINT_OF[pid]; let g = p.fig.querySelector('.body');
+  if(k && p.lm[k]){ g = p.lm[k].el; [x,y] = poseInv(p, k, x, y); }   // 傷口畫在那一節肢體上，跟著擺動
   const w = document.createElementNS('http://www.w3.org/2000/svg','circle');
   w.setAttribute('cx', x); w.setAttribute('cy', -y); w.setAttribute('r', 0.035); w.setAttribute('class','wound');
   g.appendChild(w);
@@ -1628,13 +1657,13 @@ function updHud(){
    子彈的衝量讓身體：1) 沿彈道方向被推開（滑行後摩擦停下）；2) 打偏中心會被打轉；
    3) 被打中的那一節肢體繞關節甩開，其他肢體因為慣性往反方向甩，再像彈簧一樣晃回來。
    位移與轉角也套用在命中判定上，畫面看到哪裡就打得到哪裡。 */
-const KB_FRICTION = 4.5;        // 滑行摩擦（越大停得越快）
+const KB_FRICTION = 3.6;        // 滑行摩擦（越大停得越快）
 const SPIN_FRICTION = 4;
 function placePed(p){ const b=lerp(p); p.ll=[b[0]+p.off[1]/MLAT, b[1]+p.off[0]/MLNG]; p.m.setLatLng(p.ll); }
 function toLocal(p, e, n){ const hd=p.hd+(p.spin||0), c=Math.cos(hd), s=Math.sin(hd); return [e*c - n*s, e*s + n*c]; }
 function limbKick(p, k, hx, hy, fx, fy, imp, minT=0.15){   // 在局部點 (hx,hy) 施加方向 (fx,fy) 的衝量，算出關節的角速度（minT＝保底力矩，子彈順著肢體方向打也會甩）
   const L=p.lm[k]; if(!L) return;
-  const pv=LIMBS[k].pv, rx=hx-pv[0], ry=hy-pv[1];
+  const pv=poseFwd(p, JOINTS[k].up, ...JOINTS[k].pv), rx=hx-pv[0], ry=hy-pv[1];
   let torque = rx*fy - ry*fx;                   // 逆時針為正（y 朝前的座標）
   torque = (torque<0 ? -1 : 1) * Math.max(Math.abs(torque), minT);
   L.v += -torque*imp;                           // SVG 的 y 朝下：角度正負相反
@@ -1645,25 +1674,91 @@ function hitPhysics(p, dirE, dirN, hit, power, ammoKey){
   if(!p.lm) return;
   const m = Math.hypot(dirE,dirN)||1; dirE/=m; dirN/=m;
   const f = (KICK_AMMO[ammoKey]||1) / Math.sqrt(p.sx*p.sy);   // 體型越大越推不動
-  const pid = hit ? hit.part.id : 'chest', limb = LIMB_OF[pid];
+  const pid = hit ? hit.part.id : 'chest', jnt = JOINT_OF[pid], limb = rootJoint(jnt);
   // 1) 擊退：打中軀幹最有力，打中手腳只推一點
-  const kb = (power===2 ? 6 : power===1 ? 5 : 2.5) * (limb && limb!=='hd' ? 0.5 : 1) * f;
+  const kb = (power===2 ? 11 : power===1 ? 9 : 4) * (limb && limb!=='hd' ? 0.5 : 1) * f;
   p.kv[0] += dirE*kb; p.kv[1] += dirN*kb;
   // 2) 打轉：衝量偏離身體中心就會轉
   const [fx,fy] = toLocal(p, dirE, dirN);
   const hx = hit ? hit.x : 0, hy = hit ? hit.y : 0.2;
   p.sv += Math.max(-4.5, Math.min(4.5, -(hx*fy - hy*fx) * (power ? 14 : 10) * f));   // 每槍最多轉約 60°
-  // 3) 肢體：被打中的那節猛甩，其他節因慣性往反方向晃
+  // 3) 肢體：被打中的那節猛甩（上一節也跟著動），其他節因慣性往反方向晃
   const imp = (power ? 1400 : 1000) * f;
-  if(limb) limbKick(p, limb, hx, hy, fx, fy, imp*(limb==='hd' ? 0.9 : 1.4), 0.35);
-  for(const k in p.lm) if(k!==limb){
-    const pv=LIMBS[k].pv, tip=[pv[0]*1.8, pv[1] + (k[1]==='l' ? -0.6 : k==='hd' ? 0.25 : -0.45)];   // 肢體末端大概的位置
-    limbKick(p, k, tip[0], tip[1], -fx, -fy, imp*(0.35+Math.random()*0.35));
+  const chain = []; for(let k=jnt; k; k=JOINTS[k].up) chain.push(k);
+  chain.forEach((k,i)=>limbKick(p, k, hx, hy, fx, fy, imp*(k==='hd' ? 0.9 : i ? 0.7 : 1.4), 0.35));
+  for(const k in p.lm) if(!chain.includes(k)){
+    const t = poseFwd(p, k, ...JOINTS[k].tip);
+    limbKick(p, k, t[0], t[1], -fx, -fy, imp*(0.35+Math.random()*0.35));
   }
+}
+/* ---------- 倒地姿勢 ----------
+   死掉、昏睡、倒地爬行時，每個關節換一個「平衡點」，彈簧會把肢體慢慢帶過去，
+   最後躺成手腳彎曲、交疊的自然姿勢，而不是張開的大字形。命中判定也跟著這個姿勢。 */
+const rnd = (a,b) => a + Math.random()*(b-a);
+function jointSet(p, k, outward){   // outward：以「往外張開」為正的角度，自動換成左右側的實際角度並限制範圍
+  const J=JOINTS[k], L=p.lm[k]; if(!L) return;
+  const v = Math.max(J.lim[0], Math.min(J.lim[1], outward));
+  L.r = J.side<0 ? -v : v;
+}
+function setPose(p, kind){
+  p.pose = kind;
+  const side = Math.random()<0.5 ? 1 : -1;   // 往哪一側蜷
+  const both = (k, fn) => { for(const L of ['l','r']) jointSet(p, L+k, fn(L)); };
+  // 往同一側倒：左側往外＝右側往內（實際角度同號），所以「同側」就是 outward 乘上 ±1 再依左右鏡像
+  const lean = (L, v) => (L==='l' ? 1 : -1) * side * v;
+  if(kind==='sleep'){   // 昏睡：側躺微蜷，手收在身邊
+    both('l',  L=>lean(L, rnd(5,25)));   both('lo', L=>lean(L, rnd(20,70)));
+    both('a',  L=>rnd(-25,20));           both('fa', L=>-rnd(40,110));
+    jointSet(p,'hd', side*rnd(10,35));
+  }else if(kind==='down'){   // 倒地：起始姿勢，之後爬行時由主迴圈擺動
+    p.ph = Math.random()*6.28;
+  }else{   // 死亡：隨機挑一種倒法
+    const t = Math.random();
+    if(t<0.3){   // 蜷縮側躺：四肢都彎向同一側
+      both('l',  L=>lean(L, rnd(15,50)));  both('lo', L=>lean(L, rnd(50,115)));
+      both('a',  L=>lean(L, rnd(10,90)));  both('fa', L=>lean(L, rnd(40,130)) - rnd(0,30));
+      jointSet(p,'hd', side*rnd(15,50));
+    }else if(t<0.55){   // 一手舉過頭、一手壓在身上，一腳彎起
+      const up = Math.random()<0.5 ? 'l' : 'r';
+      for(const L of ['l','r']){
+        jointSet(p, L+'a',  L===up ? rnd(110,165) : rnd(-45,-15));
+        jointSet(p, L+'fa', L===up ? rnd(-60,40)  : -rnd(60,140));
+      }
+      const bent = Math.random()<0.5 ? 'l' : 'r';
+      for(const L of ['l','r']){
+        jointSet(p, L+'l',  L===bent ? rnd(15,50) : rnd(-15,10));
+        jointSet(p, L+'lo', L===bent ? (Math.random()<0.5?1:-1)*rnd(50,115) : rnd(-20,20));
+      }
+      jointSet(p,'hd', rnd(-50,50));
+    }else if(t<0.8){   // 雙腿交疊、手臂彎曲
+      both('l',  L=>-rnd(15,35));  both('lo', L=>rnd(-35,35));
+      both('a',  L=>rnd(-40,70));  both('fa', L=>-rnd(30,140));
+      jointSet(p,'hd', rnd(-45,45));
+    }else{   // 扭曲：每個關節各自亂，但手肘、膝蓋一定有彎
+      both('l',  L=>rnd(-35,55));
+      both('lo', L=>(Math.random()<0.5?1:-1)*rnd(35,115));
+      both('a',  L=>rnd(-45,165));
+      both('fa', L=>(Math.random()<0.7?-1:1)*rnd(35,140));
+      jointSet(p,'hd', rnd(-55,55));
+    }
+  }
+}
+function crawlPose(p, dt){   // 倒地爬行：兩手輪流往前伸、腳跟著蹬
+  p.ph = (p.ph||0) + dt*2.4;
+  const a = Math.sin(p.ph), b = Math.sin(p.ph+Math.PI);
+  jointSet(p,'la', 120+35*a); jointSet(p,'lfa', -35-30*a);
+  jointSet(p,'ra', 120+35*b); jointSet(p,'rfa', -35-30*b);
+  jointSet(p,'ll', 15+15*b);  jointSet(p,'llo', 25+30*b);
+  jointSet(p,'rl', 15+15*a);  jointSet(p,'rlo', 25+30*a);
+  jointSet(p,'hd', 8*a);
 }
 function stepPhysics(dt){
   for(const p of peds){
     if(!p.lm) continue;
+    // 依狀態換姿勢：死亡 > 昏睡 > 倒地
+    const want = !p.alive ? 'dead' : p.sleep ? 'sleep' : p.down ? 'down' : null;
+    if(want && p.pose!==want) setPose(p, want);
+    if(p.pose==='down' && state==='play') crawlPose(p, dt);
     let moved = false;
     if(p.kv[0]||p.kv[1]){
       p.off[0]+=p.kv[0]*dt; p.off[1]+=p.kv[1]*dt;
@@ -1675,14 +1770,14 @@ function stepPhysics(dt){
       p.spin += p.sv*dt; p.sv *= Math.exp(-SPIN_FRICTION*dt); if(Math.abs(p.sv)<0.01) p.sv=0;
       p.fig.style.transform = `rotate(${p.hd+p.spin}rad)`;
     }
-    // 肢體：阻尼彈簧，晃幾下回到原位（死掉的人肌肉放鬆：彈簧比較軟、晃比較久）
-    const K = p.alive ? 55 : 26, C = p.alive ? 6 : 4;
+    // 肢體：阻尼彈簧，晃幾下停在姿勢上（死掉的人肌肉放鬆：彈簧比較軟、晃比較久）
+    const K = p.alive ? 55 : 22, C = p.alive ? 6 : 3.8;
     for(const k in p.lm){
-      const L=p.lm[k]; if(!L.v && !L.a) continue;
-      L.v += (-K*L.a - C*L.v)*dt; L.a += L.v*dt;
-      L.a = Math.max(-75, Math.min(75, L.a));
-      if(Math.abs(L.a)<0.2 && Math.abs(L.v)<2){ L.a=0; L.v=0; }
-      const pv=LIMBS[k].pv;
+      const L=p.lm[k]; if(!L.v && L.a===L.r) continue;
+      L.v += (-K*(L.a-L.r) - C*L.v)*dt; L.a += L.v*dt;
+      L.a = Math.max(-170, Math.min(170, L.a));
+      if(Math.abs(L.a-L.r)<0.2 && Math.abs(L.v)<2){ L.a=L.r; L.v=0; }
+      const pv=JOINTS[k].pv;
       L.el.setAttribute('transform', L.a ? `rotate(${L.a.toFixed(1)} ${pv[0]} ${-pv[1]})` : '');
     }
     if(moved && (!p.alive || p.sleep || state!=='play')) placePed(p);   // 不會自己走的人（屍體、昏睡）由這裡更新位置
@@ -2285,7 +2380,7 @@ dnBoot();
 if(/[?&]debug\b/.test(location.search)){
   window.skyMap = map;
   window.nmkDebug = { get target(){ return target; }, get save(){ return save; }, ballistics:a=>ballistics(a), fire,
-    partAtLocal, bloodHit, endGame:(w,r)=>endGame(w,r), startGame:(j,l)=>startGame(j,l), resolveShot:(a,b,k)=>{ pending++; resolveShot(a,b,k); }, get civKills(){ return civKills; }, get jobs(){ return jobs; }, get peds(){ return peds; }, get map(){ return map; }, CLIENTS, makeClient, CL_COUNT, INCIDENTS, makeJob, incidentCount, pickIncident,
+    partAtLocal, posedParts, hitPart, bloodHit, endGame:(w,r)=>endGame(w,r), startGame:(j,l)=>startGame(j,l), resolveShot:(a,b,k)=>{ pending++; resolveShot(a,b,k); }, get civKills(){ return civKills; }, get jobs(){ return jobs; }, get peds(){ return peds; }, get map(){ return map; }, CLIENTS, makeClient, CL_COUNT, INCIDENTS, makeJob, incidentCount, pickIncident,
     get timeLeft(){ return timeLeft; }, set timeLeft(v){ timeLeft=v; }, get state(){ return state; },
     sfx:{gunSound, boltSound, tickSound, alarmSound, stepCountdown}, get actx(){ return actx; },
     // 把行人可以走的路網畫在地圖上（檢查道路資料用）；再呼叫一次就關掉
