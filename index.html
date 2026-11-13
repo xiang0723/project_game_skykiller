@@ -314,7 +314,7 @@
     </div>
     <div class="tabpane" id="tab-jobs">
       <div id="jobAlert"></div>
-      <div class="row"><span style="opacity:.7">收到的求助委託（台北市）</span><button class="small" id="refreshJobs">刷新委託</button></div>
+      <div class="row"><span style="opacity:.7">收到的求助委託（台北市）</span><button class="small" id="refreshJobs">刷新委託（$50）</button></div>
       <div id="jobList"></div>
     </div>
     <div class="tabpane hidden" id="tab-ammo">
@@ -369,7 +369,7 @@
         <li>委託人會指定要打的<b>部位與順序</b>，全身 21 個部位都可能被指定，也可能重複同一處</li>
         <li><b>×21</b> 以上才看得到身體部位；帽簷朝向就是噁男面朝的方向，左右以他本人為準</li>
         <li>噁男的特徵只有兩項：<b>帽子顏色</b>（可能沒戴）和<b>上衣顏色</b>。現場不會有兩項都一樣的人，但會有同上衣不同帽子、同帽子不同上衣的誘餌。髮色只是裝飾，不用管</li>
-        <li>打中非致命部位，噁男會倒地不動；<b>頭部、頸部、胸口</b>是致命部位。他死了還是可以繼續補槍（鞭屍）完成要求</li>
+        <li>打中非致命部位，噁男會倒地，只能在地上緩慢爬行；<b>頭部、頸部、胸口</b>是致命部位。他死了還是可以繼續補槍（鞭屍）完成要求</li>
         <li>指定部位全部打到就算完成，不一定要打死他</li>
         <li><b>完美達成</b>（全部照順序）＝全額酬勞＋時間獎金；順序不對或只打中部分＝ 80% × 完成度（例如 4 個中了 2 個＝ 40%）</li>
         <li>一個指定部位都沒打到、只把他打死，只能領 10%</li>
@@ -761,6 +761,7 @@ function makeJob(){
   };
 }
 const JOB_COUNT = 6;
+const REFRESH_COST = 50;   // 刷新委託的費用
 function refreshJobs(){ jobs = []; for(let i=0;i<JOB_COUNT;i++) jobs.push(makeJob()); }
 const SHIRTS = [
   {n:'紅色',c:'#e53935'},{n:'藍色',c:'#1e63d6'},{n:'綠色',c:'#2e9e44'},{n:'黃色',c:'#fdd835'},
@@ -1313,11 +1314,17 @@ function updHud(){
 
 /* ---------- 主迴圈 ---------- */
 let last=performance.now(), hudAcc=0;
+const CRAWL_V = 0.12;   // 倒地爬行速度（m/s）
 function frame(now){
   const dt=Math.min(0.1,(now-last)/1000); last=now;
   if(state==='play'){
     for(const p of peds){
-      if(!p.alive || p.down) continue;
+      if(!p.alive) continue;
+      if(p.down){   // 被打中非致命部位：倒地後沿著道路緩慢爬行，不會逃跑
+        let d=CRAWL_V*dt;
+        while(d>0){ const rem=p.len-p.t; if(d<rem){p.t+=d; d=0;} else {d-=rem; nextEdge(p); p.wait=0;} }
+        p.ll=lerp(p); p.m.setLatLng(p.ll); continue;
+      }
       if(p.wait>0 && p.panic<=0){ p.wait-=dt; continue; }
       if(p.panic>0) p.panic-=dt;
       let d=p.base*(p.panic>0 ? (p.isTarget?3.6:2.8) : 1)*dt;
@@ -1467,7 +1474,7 @@ function resolveShot(aim, aimed, ammoKey){
       // 麻醉彈打哪都不致命；破片彈打哪都致命
       const lethal = A.nonlethal ? false : A.allLethal ? true : part.lethal;
       if(lethal && best.alive){ best.alive=false; best.down=true; best.root.classList.add('dead'); }
-      else if(best.alive) best.down = true;   // 非致命部位：倒地無法移動
+      else if(best.alive) best.down = true;   // 非致命部位：倒地，之後只能緩慢爬行
       renderReq();
       if(reqAllHit()){   // 指定部位全部打到：委託完成（照順序 = 完美達成）
         log(`🎯 命中噁男【${part.nm}】${note}　委託要求全部完成！`, perfect()?'var(--accent)':'#ffcc66');
@@ -1603,7 +1610,9 @@ $('startBox').addEventListener('click', e=>{
   else if(b.dataset.up){ const k=b.dataset.up, u=UPGRADES[k], lv=save.up[k];
     const c=priceOf(u.cost[lv]||0);
     if(lv<u.vals.length-1 && save.money>=c){ save.money-=c; save.up[k]++; persist(); renderTerminal(); } }
-  else if(b.id==='refreshJobs'){ refreshJobs(); renderJobs(); }
+  else if(b.id==='refreshJobs'){   // 每次刷新扣 NT$ 50
+    if(save.money<REFRESH_COST){ showDialog({title:'錢不夠', msg:`刷新委託要 ${money(REFRESH_COST)}，你現在只有 ${money(save.money)}。`, ok:'知道了'}); return; }
+    save.money-=REFRESH_COST; persist(); refreshJobs(); renderTerminal(); }
   else if(b.id==='resetSave'){
     showDialog({title:'清除存檔？', msg:'資金、彈藥、裝備、聲望都會重置，而且無法復原。', ok:'清除存檔', cancel:'取消', danger:true})
       .then(yes=>{ if(yes){ save=NEW_SAVE(); persist(); refreshJobs(); renderTerminal(); showTab('jobs'); } });
