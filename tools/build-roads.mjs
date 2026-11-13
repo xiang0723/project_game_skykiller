@@ -14,7 +14,27 @@ const SERVERS = [
   'https://overpass.kumi.systems/api/interpreter',
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ];
-const HIGHWAY = '^(footway|pedestrian|residential|living_street|service|tertiary|secondary|primary|unclassified|path|steps|trunk)$';
+/* 行人只能走在街道巷弄上，不能穿過建築物、樹叢：
+   - 一般道路與巷弄：residential、living_street、unclassified、tertiary、secondary、primary、pedestrian（徒步區）
+   - service（巷弄常用）排除停車場車道、私人車道、得來速、緊急通道（這些常伸進建築物或停車場裡）
+   - footway 只留人行道與行人穿越道（其他 footway 常是穿過中庭、騎樓、建築物的通道）
+   - footway / path / steps / cycleway 在公園、綠地範圍內才算（公園裡可以走步道）
+   - 全部排除隧道、有遮蓋的通道（含騎樓 covered=arcade）、室內、地下（layer 負值）、廣場外框（area=yes）、禁止進入的私人道路
+   - 不收 trunk（台北市的 trunk 幾乎都是高架快速道路，行人不會在上面走） */
+const roadQuery = area => `
+(
+  way["highway"~"^(residential|living_street|unclassified|tertiary|secondary|primary|pedestrian)$"](area.${area});
+  way["highway"="service"]["service"!~"^(parking_aisle|driveway|drive-through|emergency_access)$"](area.${area});
+  way["highway"="footway"]["footway"~"^(sidewalk|crossing)$"](area.${area});
+)->.a;
+(
+  way["leisure"~"^(park|garden)$"](area.${area});
+  rel["leisure"~"^(park|garden)$"](area.${area});
+)->.pk;
+.pk map_to_area->.parks;
+way["highway"~"^(footway|path|steps|cycleway|pedestrian)$"](area.parks)->.b;
+(.a; .b;)->.all;
+way.all["tunnel"!~"."]["covered"!~"^(yes|arcade|colonnade)$"]["indoor"!="yes"]["area"!="yes"]["layer"!~"^-"]["access"!~"^(private|no)$"]->.w;`;
 
 // 從 index.html 讀出行政區清單（key 與 OSM 名稱）
 const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
@@ -95,7 +115,7 @@ area["name"="臺北市"]["admin_level"="4"]->.tp;
 rel(area.tp)["boundary"="administrative"]["name"="${name}"]->.r;
 .r out geom;
 .r map_to_area->.d;
-way["highway"~"${HIGHWAY}"](area.d)->.w;
+${roadQuery('d')}
 .w out skel qt;
 node(w.w);
 out skel qt;`;
