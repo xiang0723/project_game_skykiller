@@ -1,0 +1,1218 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>噁男殺手</title>
+<link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{--hud:rgba(10,14,12,.78);--fg:#d8f5d0;--accent:#7dff6a;--warn:#ff5252;}
+  html,body{margin:0;height:100%;background:#000;color:var(--fg);font-family:"Consolas","Noto Sans TC",monospace;overflow:hidden}
+  #map{position:absolute;inset:0;background:#111}
+  .leaflet-container{background:#111}
+
+  /* 行人 */
+  .pedicon{background:none;border:none}
+  .ped{position:absolute;width:var(--s);height:var(--s);margin:calc(var(--s)/-2) 0 0 calc(var(--s)/-2);
+       border-radius:50%;background:var(--shirt);box-shadow:0 0 0 1px rgba(0,0,0,.65),0 1px 3px rgba(0,0,0,.6)}
+  .ped i{position:absolute;left:27%;top:27%;width:46%;height:46%;border-radius:50%;background:var(--hat);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+  .d0 .ped{background:#cfcfcf}
+  .d0 .ped i,.d1 .ped i{display:none}
+  .dead .ped,.ped.dead{background:#5a0000 !important;opacity:.85}
+  .dead .ped i{display:none !important}
+  .ped.dead i{display:none !important}
+  .ped.dead::after{content:"✕";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+       color:#ff3030;font-size:calc(var(--s)*1.1);font-weight:bold;line-height:1}
+  /* 人形（×21 以上顯示）：SVG 以公尺為單位，--m = 每公尺幾像素 */
+  .pw{position:absolute;left:0;top:0}
+  .fig{display:none;position:absolute;width:calc(var(--m)*2.2px);height:calc(var(--m)*2.6px);
+       left:calc(var(--m)*-1.1px);top:calc(var(--m)*-1.3px);overflow:visible;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
+  .d3 .fig{display:block}
+  .d3 .ped{display:none}
+  .pw .ped{width:calc(var(--s)*var(--k,1));height:calc(var(--s)*var(--k,1));margin:calc(var(--s)*var(--k,1)/-2) 0 0 calc(var(--s)*var(--k,1)/-2)}
+  .pw.nohat .hatg{display:none}
+  .pw:not(.nohat) .nose{display:none}
+  .pw.dead .fig{opacity:.75;filter:grayscale(.7) drop-shadow(0 1px 2px rgba(0,0,0,.7))}
+  .fig .wound{fill:#d10000;stroke:#ff8a8a;stroke-width:.015}
+  .fig .xmark{stroke:#ff2020;stroke-width:.08;stroke-linecap:round;display:none}
+  .pw.dead .xmark{display:block}
+  .impact{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;
+       border:2px solid rgba(255,230,150,.9);animation:imp .8s ease-out forwards}
+  @keyframes imp{from{transform:scale(.2);opacity:1}to{transform:scale(1.6);opacity:0}}
+
+  /* 瞄準鏡 */
+  #scope{position:fixed;inset:0;pointer-events:none;z-index:500;opacity:0;transition:opacity .25s;
+       background:radial-gradient(circle at center,transparent 0,transparent 40vmin,rgba(0,0,0,.88) 40.5vmin)}
+  #scope.on{opacity:1}
+  #cross{position:fixed;left:50%;top:50%;width:240px;height:240px;margin:-120px 0 0 -120px;pointer-events:none;z-index:510}
+  #rangetag{position:fixed;z-index:600;left:50%;top:calc(50% + 128px);transform:translateX(-50%);font-size:13px;color:#ffe9a8;
+       text-shadow:0 0 3px #000,0 0 3px #000;pointer-events:none;white-space:nowrap;text-align:center;line-height:1.5}
+  #rangetag .arw{display:inline-block;color:#7fd8ff}
+  #rangetag .bad{color:var(--warn)}
+  .shooter{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;border:2px solid #7fd8ff;
+       background:rgba(0,40,60,.6);box-shadow:0 0 8px #7fd8ff}
+  .shooter::after{content:"狙擊位置";position:absolute;left:26px;top:2px;color:#7fd8ff;font-size:12px;white-space:nowrap;text-shadow:0 0 3px #000}
+  #windArw{display:inline-block;transition:transform .5s linear;color:#7fd8ff;font-weight:bold}
+  #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:520}
+  #flash.go{animation:fl .15s ease-out}
+  @keyframes fl{from{opacity:.55}to{opacity:0}}
+  body.recoil #map{animation:rc .25s ease-out}
+  @keyframes rc{0%{transform:translateY(0)}20%{transform:translateY(-10px)}100%{transform:translateY(0)}}
+
+  /* HUD */
+  .panel{position:fixed;z-index:600;background:var(--hud);border:1px solid rgba(125,255,106,.35);border-radius:6px;padding:10px 12px;backdrop-filter:blur(2px)}
+  #hud{top:10px;left:10px;font-size:14px;line-height:1.6;min-width:170px}
+  #hud b{color:var(--accent)}
+  #dossier{top:10px;right:10px;font-size:13px;max-width:230px}
+  #dossier h3{margin:0 0 6px;font-size:13px;color:var(--warn);letter-spacing:2px}
+  #dossier .pv{display:flex;align-items:center;gap:10px;margin:6px 0}
+  #dossier .pv .ped{position:relative;margin:0;--s:34px}
+  #log{bottom:10px;left:10px;font-size:13px;max-width:min(420px,calc(100vw - 150px));min-height:20px}
+  #fire{position:fixed;z-index:600;right:16px;bottom:16px;width:96px;height:96px;border-radius:50%;
+       border:2px solid var(--warn);background:rgba(120,0,0,.6);color:#fff;font:bold 18px inherit;font-family:inherit;cursor:pointer}
+  #fire:active{background:rgba(200,0,0,.8)}
+  #extract{position:fixed;z-index:600;right:122px;bottom:30px;padding:8px 14px;border-radius:6px;border:1px solid #7fd8ff;
+       background:rgba(0,40,60,.7);color:#bfefff;font-family:inherit;font-size:14px;cursor:pointer}
+  #extract.ready{background:#7fd8ff;color:#012;font-weight:bold;box-shadow:0 0 12px #7fd8ff}
+  #fire:disabled{opacity:.4}
+  #zoomtag{position:fixed;z-index:600;left:50%;top:calc(50% - 140px);transform:translateX(-50%);font-size:12px;color:var(--accent);
+       text-shadow:0 0 3px #000;pointer-events:none}
+
+  /* 開始 / 結算畫面 */
+  #overlay{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:16px}
+  #overlay .box{max-width:460px;width:100%;background:#0d130f;border:1px solid rgba(125,255,106,.4);border-radius:8px;padding:20px;line-height:1.6}
+  #overlay h1{margin:0 0 6px;color:var(--accent);font-size:26px;letter-spacing:3px}
+  #overlay h2{margin:0 0 10px;font-size:22px}
+  #overlay select,#overlay button{font-family:inherit;font-size:15px;padding:8px 12px;border-radius:4px;border:1px solid var(--accent);background:#132016;color:var(--fg)}
+  #overlay button{background:var(--accent);color:#031;font-weight:bold;cursor:pointer;margin-top:10px}
+  #overlay ul{padding-left:18px;margin:8px 0;font-size:14px}
+  .hidden{display:none !important}
+
+  /* 暗網終端 */
+  #jobList{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
+  #jobList .job{margin:0;display:flex;flex-direction:column}
+  #jobList .job button{margin-top:auto !important;align-self:flex-start}
+  #jobList .job .meta:last-of-type{margin-bottom:8px}
+  #jobList .note{grid-column:1/-1}
+  @media (max-width:640px){ #jobList{grid-template-columns:1fr} }
+  #overlay .box.term{max-width:960px;max-height:calc(100vh - 32px);overflow:auto;box-sizing:border-box;
+       box-shadow:0 0 30px rgba(125,255,106,.12),inset 0 0 60px rgba(0,0,0,.6)}
+  .termhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;font-size:13px;border-bottom:1px solid rgba(125,255,106,.25);padding-bottom:8px}
+  .termhead .stats b{color:var(--accent)}
+  .brand{color:#ff4d6d;letter-spacing:2px}
+  .blink{color:#ff4d6d;animation:bl 1.2s steps(2) infinite}
+  @keyframes bl{50%{opacity:0}}
+  .tabs{display:flex;gap:6px;margin:10px 0}
+  #overlay .tab{margin:0;background:#132016;color:var(--fg);font-weight:normal}
+  #overlay .tab.on{background:var(--accent);color:#031;font-weight:bold}
+  #overlay button.small{margin:0;padding:4px 10px;font-size:13px;background:#132016;color:var(--fg)}
+  #overlay button:disabled{opacity:.4;cursor:not-allowed}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}
+  .job{border:1px solid rgba(125,255,106,.25);border-radius:6px;padding:10px 12px;margin-bottom:10px;background:rgba(20,32,23,.6)}
+  .job .top{display:flex;justify-content:space-between;gap:8px;font-size:13px;opacity:.85}
+  .job .msg{margin:6px 0;font-size:14px;color:#f2f2f2}
+  .job .meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;align-items:center}
+  .job .meta b{color:var(--accent)}
+  .job .pay{color:#ffd54a;font-weight:bold}
+  .job .ped{position:relative;display:inline-block;margin:0;--s:22px;vertical-align:middle}
+  .job button{margin-top:8px !important}
+  .item{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px dashed rgba(125,255,106,.18);padding:9px 0;font-size:13px}
+  .item .nm{font-size:14px;color:#fff}
+  .item .lv{color:var(--accent)}
+  .item .ds{opacity:.7}
+  .item button{margin:0 !important;white-space:nowrap}
+  #tab-info h3{margin:10px 0 4px;color:#ff4d6d;font-size:15px}
+  #tab-info p{margin:4px 0;font-size:14px}
+  .result td{padding:2px 10px 2px 0}
+  .result .neg{color:var(--warn)} .result .pos{color:var(--accent)}
+  #aimpt{position:fixed;z-index:511;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:#38d9ff;
+       box-shadow:0 0 0 2px rgba(0,0,0,.6),0 0 8px #38d9ff;pointer-events:none}
+  @media (max-width:600px){
+    #dossier{top:auto;bottom:122px;right:10px;max-width:180px;font-size:12px}
+    #hud{font-size:12px}
+    #log{bottom:10px;max-width:calc(100vw - 140px)}
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="scope"></div>
+<svg id="cross" viewBox="0 0 240 240"></svg>
+<div id="zoomtag"></div>
+<div id="rangetag"></div>
+<div id="aimpt" class="hidden"></div>
+<div id="flash"></div>
+
+<div id="hud" class="panel">
+  <div>地點：<b id="hCity">-</b></div>
+  <div>時間：<b id="hTime">-</b></div>
+  <div>彈藥：<b id="hAmmo">-</b></div>
+  <div>誤殺：<b id="hCiv">0</b></div>
+  <div>倍率：<b id="hZoom">-</b></div>
+  <div>風向：<span id="windArw">↑</span> <b id="hWind">-</b></div>
+</div>
+<div id="dossier" class="panel">
+  <h3>▌噁男檔案</h3>
+  <div id="dJob" style="opacity:.85;margin-bottom:4px"></div>
+  <div class="pv"><div class="ped" id="dPv"><i></i></div><div id="dTxt"></div></div>
+  <div id="dReq" style="margin:6px 0;line-height:1.5"></div>
+  <div style="opacity:.75;font-size:12px">俯視：身體＝上衣，頭頂＝帽子，帽簷朝前，帽子外圈露出的頭髮看年齡（老人白髮、走得慢）。×21 以上看得到四肢與體型，左右以噁男本人為準</div>
+</div>
+<div id="log" class="panel">待命中…</div>
+<button id="fire">開火<br><small>SPACE</small></button>
+<button id="extract">撤離</button>
+
+<div id="overlay">
+  <!-- 暗網終端 -->
+  <div class="box term" id="startBox">
+    <div class="termhead">
+      <div><span class="blink">●</span> DARKNET://nmk.onion　<b class="brand">噁男殺手</b> <span style="opacity:.6">ver 0.2</span></div>
+      <div class="stats">資金 <b id="sMoney">-</b>｜子彈 <b id="sAmmo">-</b>｜聲望 <b id="sRep">-</b>｜完成 <b id="sDone">-</b></div>
+    </div>
+    <div class="tabs">
+      <button class="tab on" data-tab="jobs">委託</button>
+      <button class="tab" data-tab="shop">軍火庫</button>
+      <button class="tab" data-tab="info">檔案</button>
+    </div>
+    <div class="tabpane" id="tab-jobs">
+      <div class="row"><span style="opacity:.7">收到的求助委託（台北市）</span><button class="small" id="refreshJobs">刷新委託</button></div>
+      <div id="jobList"></div>
+    </div>
+    <div class="tabpane hidden" id="tab-shop">
+      <div id="shopList"></div>
+    </div>
+    <div class="tabpane hidden" id="tab-info">
+      <h3>背景</h3>
+      <p>噁男事件層出不窮。偷拍、尾隨、咸豬手、暴露、跟騷……他們鑽法律漏洞、挑戰公權力，被抓了交保、緩起訴，隔天又出現在同一條路上。</p>
+      <p>求助無門的受害女性與女學生，最後只能在暗網上找到你：<b class="brand">噁男殺手</b>。頂尖駭客、職業狙擊手，對一般仇殺沒興趣，只接她們的委託。</p>
+      <p>她們付不起高價，酬勞不多，但夠你買子彈、升級裝備。</p>
+      <h3>操作</h3>
+      <ul>
+        <li>拖曳地圖瞄準，<b>SPACE</b> 或右下角按鈕開火（準星永遠在畫面中央）</li>
+        <li>滾輪、雙指或 <b>E / Q</b> 縮放＝狙擊鏡倍率。<b>×18</b> 看得到上衣顏色，<b>×19</b> 以上看得到帽子</li>
+        <li>你在<b style="color:#7fd8ff">藍圈</b>的位置開槍，距離越遠子彈飛越久，移動中的目標要抓提前量</li>
+        <li>橫風會把子彈吹偏，準星有刻度（右側標示 1 格幾公尺）可以修正</li>
+        <li><b style="color:#ff6b6b">紅框</b>是地圖邊界，<b style="color:#ffd54a">黃圈</b>是噁男活動範圍，白色虛線是行政區界</li>
+        <li>槍聲會讓附近的人逃跑；誤殺路人會被扣酬勞和聲望</li>
+      </ul>
+      <h3>委託條件</h3>
+      <ul>
+        <li>委託人會指定要打的<b>部位與順序</b>，全身 21 個部位都可能被指定，也可能重複同一處</li>
+        <li><b>×21</b> 以上才看得到身體部位；帽簷朝向就是噁男面朝的方向，左右以他本人為準</li>
+        <li>噁男有<b>高矮、胖瘦、年齡</b>特徵：體型直接看身形大小，年齡看帽子外圈的頭髮顏色（少年青年黑或染髮、中年灰黑、老年白髮）與走路速度。★★ 以上會有上衣帽子完全一樣的撞衫路人</li>
+        <li>打中非致命部位，噁男會倒地不動；<b>頭部、頸部、胸口</b>是致命部位</li>
+        <li>噁男死了但要求還沒完成，就繼續對屍體補槍（鞭屍）。全部完成、而且他已經死了，任務才算完成</li>
+        <li>全部依序命中＝全額酬勞＋時間獎金；打錯部位或順序，只能依完成比例拿 30～80%</li>
+        <li>噁男死後可以按「收工撤離」提早結算</li>
+      </ul>
+      <p style="font-size:12px;opacity:.55">本遊戲純屬虛構，人物與委託皆為隨機產生。<br>
+        <button class="small" id="resetSave" style="margin-top:6px">清除存檔重新開始</button></p>
+    </div>
+    <div id="prog" class="hidden" style="margin-top:10px">
+      <div style="height:8px;background:#1d2b20;border-radius:4px;overflow:hidden">
+        <div id="progBar" style="height:100%;width:0;background:var(--accent);transition:width .2s"></div>
+      </div>
+      <div id="progTxt" style="margin-top:6px;font-size:12px;opacity:.85"></div>
+    </div>
+    <div id="loadMsg" style="margin-top:6px;font-size:13px;color:var(--warn)"></div>
+  </div>
+  <!-- 任務結算 -->
+  <div class="box term hidden" id="endBox">
+    <h2 id="endTitle"></h2>
+    <div id="endTxt"></div>
+    <button id="againBtn">回到暗網</button>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- 設定 ---------- */
+// 主要城市：台北市。選一個行政區，每局在區內隨機挑一塊當狙擊場。
+// name 必須與 OpenStreetMap 上的行政區名稱一致；c 是內建資料缺漏時的備援中心點。
+const DISTRICTS = {
+  xinyi:     {name:'信義區', c:[25.0330,121.5680]},
+  daan:      {name:'大安區', c:[25.0265,121.5435]},
+  zhongzheng:{name:'中正區', c:[25.0400,121.5160]},
+  zhongshan: {name:'中山區', c:[25.0640,121.5330]},
+  songshan:  {name:'松山區', c:[25.0560,121.5600]},
+  datong:    {name:'大同區', c:[25.0630,121.5130]},
+  wanhua:    {name:'萬華區', c:[25.0300,121.4990]},
+  shilin:    {name:'士林區', c:[25.0930,121.5250]},
+  beitou:    {name:'北投區', c:[25.1320,121.5010]},
+  neihu:     {name:'內湖區', c:[25.0700,121.5900]},
+  nangang:   {name:'南港區', c:[25.0480,121.6070]},
+  wenshan:   {name:'文山區', c:[24.9950,121.5550]},
+};
+const RADIUS_M   = 450;   // 遊戲區域半徑
+const HIT_R      = 1.4;   // 命中半徑（公尺）
+const SHOOTER_MIN = 380, SHOOTER_MAX = 650;  // 狙擊位置離區域中心的距離
+const MAX_RANGE  = 1200;  // 有效射程（公尺）
+const WIND_K     = 0.6;   // 風偏係數：偏移 = 橫風 × 飛行時間 × K
+const SPREAD_PER_KM = 0.10; // 散布：每 1000 m 約 ±0.10 m（標準差）
+
+const PANTS = ['#2b3a55','#3a3a3a','#5b4636','#1f2a24','#4a4f5a','#6b6b6b'];
+/* 體型與年齡：sy = 身長倍率、sx = 身寬倍率（同時影響外觀與命中判定）。
+   年齡看頭髮顏色（帽子周圍露出來的一圈）與走路速度。 */
+const HEIGHTS = [ {n:'高個子', sy:1.13}, {n:'中等身高', sy:1.0}, {n:'矮個子', sy:0.87} ];
+const BUILDS  = [ {n:'胖', sx:1.35}, {n:'壯', sx:1.16}, {n:'普通身材', sx:1.0}, {n:'瘦', sx:0.8} ];
+const AGES    = [
+  {n:'少年', sy:0.9,  spd:[1.5,1.9], hair:['#141414','#3b2a1e']},
+  {n:'青年', sy:1.0,  spd:[1.2,1.7], hair:['#141414','#3b2a1e','#8a5a2b','#c49a3a']},
+  {n:'中年', sy:1.0,  spd:[1.0,1.35],hair:['#2a2a2a','#5a5550']},
+  {n:'老年', sy:0.97, spd:[0.55,0.9],hair:['#d6d6d6','#f0f0f0','#a8a8a8']},
+];
+const randBody = () => ({h:Math.floor(Math.random()*HEIGHTS.length), b:Math.floor(Math.random()*BUILDS.length), a:Math.floor(Math.random()*AGES.length)});
+const bodyText = bd => `${AGES[bd.a].n}、${HEIGHTS[bd.h].n}、${BUILDS[bd.b].n}`;
+const sameBody = (x,y) => x.h===y.h && x.b===y.b && x.a===y.a;
+
+/* ---------- 身體部位 ----------
+   局部座標（公尺）：x = 角色的右方，y = 角色的前方（面朝方向）。左右以角色本身為準。
+   尺寸比真人略大，方便遊戲瞄準。type c = 圓，s = 膠囊（線段 a→b，寬 w）。
+   PARTS 同時用來畫 SVG 與判定命中，畫面與判定一定一致。 */
+// 陣列順序 = 繪製順序（後畫的蓋在上面）。座標是基準尺寸，實際再乘上 BODY_SCALE。
+const BODY_SCALE = 1.25;
+const PARTS = [
+  {id:'lfoot',   nm:'左腳掌',  type:'s', a:[-0.19,-0.84], b:[-0.20,-0.94], w:0.10, fill:'shoe'},
+  {id:'rfoot',   nm:'右腳掌',  type:'s', a:[ 0.19,-0.84], b:[ 0.20,-0.94], w:0.10, fill:'shoe'},
+  {id:'lcalf',   nm:'左小腿',  type:'s', a:[-0.17,-0.55], b:[-0.19,-0.80], w:0.13, fill:'pants'},
+  {id:'rcalf',   nm:'右小腿',  type:'s', a:[ 0.17,-0.55], b:[ 0.19,-0.80], w:0.13, fill:'pants'},
+  {id:'lthigh',  nm:'左大腿',  type:'s', a:[-0.12,-0.17], b:[-0.16,-0.43], w:0.16, fill:'pants'},
+  {id:'rthigh',  nm:'右大腿',  type:'s', a:[ 0.12,-0.17], b:[ 0.16,-0.43], w:0.16, fill:'pants'},
+  {id:'lknee',   nm:'左膝蓋',  type:'c', c:[-0.165,-0.49], r:0.07, fill:'pants2'},
+  {id:'rknee',   nm:'右膝蓋',  type:'c', c:[ 0.165,-0.49], r:0.07, fill:'pants2'},
+  {id:'abdomen', nm:'腹部',    type:'s', a:[ 0.00, 0.02], b:[ 0.00,-0.08], w:0.38, fill:'shirt'},
+  {id:'groin',   nm:'胯下',    type:'c', c:[ 0.00,-0.18], r:0.08, fill:'pants2'},
+  {id:'lupper',  nm:'左上臂',  type:'s', a:[-0.30, 0.22], b:[-0.40, 0.02], w:0.12, fill:'shirt'},
+  {id:'rupper',  nm:'右上臂',  type:'s', a:[ 0.30, 0.22], b:[ 0.40, 0.02], w:0.12, fill:'shirt'},
+  {id:'lfore',   nm:'左前臂',  type:'s', a:[-0.41,-0.01], b:[-0.47,-0.17], w:0.10, fill:'skin'},
+  {id:'rfore',   nm:'右前臂',  type:'s', a:[ 0.41,-0.01], b:[ 0.47,-0.17], w:0.10, fill:'skin'},
+  {id:'lhand',   nm:'左手掌',  type:'c', c:[-0.49,-0.25], r:0.075, fill:'skin2'},
+  {id:'rhand',   nm:'右手掌',  type:'c', c:[ 0.49,-0.25], r:0.075, fill:'skin2'},
+  {id:'chest',   nm:'胸口',    type:'s', a:[ 0.00, 0.23], b:[ 0.00, 0.17], w:0.40, fill:'shirt', lethal:true},   // 下緣 y=-0.03，以下是腹部
+  {id:'lshould', nm:'左肩膀',  type:'c', c:[-0.27, 0.26], r:0.085, fill:'shirt2'},
+  {id:'rshould', nm:'右肩膀',  type:'c', c:[ 0.27, 0.26], r:0.085, fill:'shirt2'},
+  {id:'neck',    nm:'頸部',    type:'s', a:[ 0.00, 0.37], b:[ 0.00, 0.28], w:0.14, fill:'skin', lethal:true},   // 露出區約 y 0.21~0.38
+  {id:'head',    nm:'頭部',    type:'c', c:[ 0.00, 0.53], r:0.14, fill:'hair', lethal:true},   // 頭髮；帽子另外疊上去
+];
+const PART = Object.fromEntries(PARTS.map(p=>[p.id,p]));
+// 重疊處由小部位優先
+const HIT_PRIORITY = ['head','neck','lhand','rhand','lknee','rknee','groin','lfoot','rfoot','lshould','rshould',
+  'lfore','rfore','lupper','rupper','chest','abdomen','lcalf','rcalf','lthigh','rthigh'];
+const HIT_TOL = 0.015;
+function segDist(px,py,[ax,ay],[bx,by]){
+  const dx=bx-ax, dy=by-ay, t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)));
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+function partAtLocal(x,y){
+  for(const id of HIT_PRIORITY){
+    const p=PART[id];
+    const d = p.type==='c' ? Math.hypot(x-p.c[0], y-p.c[1]) - p.r : segDist(x,y,p.a,p.b) - p.w/2;
+    if(d<=HIT_TOL) return p;
+  }
+  return null;
+}
+function figSVG(){
+  const col = f => `var(--${f})`, Y = v => -v;   // SVG 的 y 軸向下
+  let s = '';
+  for(const p of PARTS){
+    // 每個部位先畫一圈深色外框，部位之間的分界才看得清楚
+    if(p.type==='s') s += `<line x1="${p.a[0]}" y1="${Y(p.a[1])}" x2="${p.b[0]}" y2="${Y(p.b[1])}" stroke="rgba(0,0,0,.55)" stroke-width="${p.w+0.025}" stroke-linecap="round"/>`+
+                          `<line x1="${p.a[0]}" y1="${Y(p.a[1])}" x2="${p.b[0]}" y2="${Y(p.b[1])}" stroke="${col(p.fill)}" stroke-width="${p.w}" stroke-linecap="round"/>`;
+    else s += `<circle cx="${p.c[0]}" cy="${Y(p.c[1])}" r="${p.r}" fill="${col(p.fill)}" stroke="rgba(0,0,0,.55)" stroke-width=".0125"/>`;
+  }
+  // 帽子（比頭小一圈，周圍露出頭髮看年齡）＋帽簷（標示面朝方向，分辨左右用）；沒戴帽的人只畫鼻尖
+  s += `<g class="hatg"><circle cx="0" cy="${Y(0.53)}" r="0.105" fill="var(--hat)" stroke="rgba(0,0,0,.45)" stroke-width=".012"/>`+
+       `<ellipse cx="0" cy="${Y(0.68)}" rx="0.1" ry="0.05" fill="var(--hat)" stroke="rgba(0,0,0,.55)" stroke-width=".015"/></g>`;
+  s += `<circle class="nose" cx="0" cy="${Y(0.675)}" r="0.03" fill="var(--skin)" stroke="rgba(0,0,0,.5)" stroke-width=".01"/>`;
+  s += `<g class="xmark"><line x1="-.3" y1="-.4" x2=".3" y2=".2"/><line x1=".3" y1="-.4" x2="-.3" y2=".2"/></g>`;
+  return `<svg class="fig" viewBox="-1.1 -1.3 2.2 2.6"><g class="body" transform="scale(__SX__,__SY__)">${s}</g></svg>`;
+}
+const FIG_SVG = figSVG();
+
+/* ---------- 經濟與裝備 ---------- */
+const AMMO_PRICE = 250;
+const CIV_PAY_CUT = 0.3, CIV_REP = 10;   // 每誤殺一人：酬勞 -30%、聲望 -10
+// 每項裝備的各等級數值與升級價格（cost[i] = 升到第 i+1 級的價錢）
+const UPGRADES = {
+  scope:   {nm:'狙擊鏡',       vals:[22,23,24],        cost:[6000,15000], fmt:v=>`最大倍率 ×${v}（×21 起看得到身體部位）`},
+  mag:     {nm:'彈匣',         vals:[5,7,10],          cost:[4000,10000], fmt:v=>`每次任務最多帶 ${v} 發`},
+  barrel:  {nm:'高速槍管',     vals:[780,920,1080],    cost:[5000,12000], fmt:v=>`彈速 ${v} m/s（提前量、風偏更小）`},
+  comp:    {nm:'彈道電腦',     vals:[0,1,2],           cost:[3000,9000],  fmt:v=>['只顯示距離與風向','顯示預估風偏','直接標出修正後瞄準點'][v]},
+  silencer:{nm:'消音器',       vals:[70,40,20],        cost:[4000,10000], fmt:v=>`槍聲驚動半徑 ${v} m`},
+  recon:   {nm:'監視器入侵',   vals:[0,1,2],           cost:[5000,12000], fmt:v=>['無','開局標出噁男大概位置（半徑 120 m）','每 30 秒更新一次大概位置'][v]},
+};
+const SAVE_KEY = 'nmk_save_v1';
+const NEW_SAVE = () => ({money:3000, ammo:10, rep:0, done:0, up:{scope:0,mag:0,barrel:0,comp:0,silencer:0,recon:0}});
+let save = NEW_SAVE();
+try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)); if(s) save=Object.assign(NEW_SAVE(), s, {up:Object.assign(NEW_SAVE().up, s.up)}); }catch(e){}
+function persist(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }catch(e){} }
+const U = k => UPGRADES[k].vals[save.up[k]];
+const money = n => 'NT$ ' + Math.round(n).toLocaleString('en-US');
+
+/* ---------- 委託產生器 ---------- */
+// 委託人：minor = 未成年。未成年委託人只會搭配標記 m 的（非露骨）事件描述。
+const CLIENTS = [
+  {n:'小雨．上班族'},{n:'Y．大學生'},{n:'阿綾．超商店員'},{n:'M．護理師'},{n:'Lin．咖啡店員'},{n:'匿名．夜班櫃檯'},
+  {n:'芸．研究生'},{n:'Ivy．健身教練'},{n:'匿名．外送員'},{n:'小鹿．實習生'},{n:'匿名．房屋仲介'},{n:'Mia．空服員'},
+  {n:'匿名．單親媽媽'},{n:'阿真．夜市攤販'},{n:'匿名．社工'},{n:'Hana．美髮師'},{n:'匿名．研究助理'},{n:'小安．銀行行員'},
+  {n:'匿名．高二女生',minor:1},{n:'小晴．補習班學生',minor:1},{n:'匿名．高職女生',minor:1},{n:'芊．國三學生',minor:1},
+  {n:'匿名．高一女生',minor:1},{n:'Momo．高三學生',minor:1},
+];
+// lv：1 輕、2 中、3 重（極度噁心）。m：未成年委託人也可使用（描述不露骨）。
+const INCIDENTS = [
+  // ── 輕 ──
+  {lv:1, t:'他每天在公司樓下等我，傳訊息說「妳今天穿裙子很好看」，我從來沒給過他電話。'},
+  {lv:1, t:'他在巷口對路過的女生吹口哨、評論身材，還偷拍上傳到群組幫大家「打分數」。'},
+  {lv:1, t:'健身房裡他一直盯著我，假裝路過，用手機對著我深蹲的時候拍。'},
+  {lv:1, m:1, t:'他在網路上不停私訊我，被封鎖就開新帳號，已經換了二十幾個。'},
+  {lv:1, m:1, t:'他每天在補習班門口跟女生搭訕，問「要不要坐叔叔的車回家」。'},
+  {lv:1, m:1, t:'他跟著我進捷運，我換車廂他也換，我下車他也下車。'},
+  {lv:1, t:'結帳時他故意握住我的手不放，說「手好軟喔」，之後每天都來我這一櫃。'},
+  {lv:1, t:'我的每張照片下面都有他的留言，評論我的胸部和腿，還截圖到論壇。'},
+  {lv:1, m:1, t:'他每天在學校後門拿手機拍穿制服的女生，被警衛趕走隔天又來。'},
+  {lv:1, t:'我送餐到他家，他開門只穿一條內褲，硬要我進去「拿小費」。'},
+  {lv:1, m:1, t:'放學路上有個男人騎機車跟著我，停下來問我「一次多少錢」。'},
+  {lv:1, t:'他是公司主管，開會時會故意把手放在我大腿上，說是「鼓勵」。'},
+  // ── 中 ──
+  {lv:2, m:1, t:'公車上的咸豬手，被抓過三次，每次都交保，現在還是天天搭同一路線。'},
+  {lv:2, t:'他在捷運手扶梯上用藏在鞋子裡的鏡頭拍我裙底，影片被放到付費群組賣。'},
+  {lv:2, m:1, t:'他在網路上肉搜到我的住址，常在我家樓下徘徊，還在信箱裡塞他自己的照片。'},
+  {lv:2, t:'前同事跟騷我半年，保護令對他根本沒用，他還跑去我老家按門鈴。'},
+  {lv:2, t:'在夜市人擠人的時候，他用下體一直貼著我的屁股磨蹭，事後還在社群上炫耀「今天又有收穫」。'},
+  {lv:2, m:1, t:'他在公園對放學的女學生暴露，被抓了還是緩起訴，又回到同一個公園。'},
+  {lv:2, t:'他在健身房偷拍女生換衣服被抓，賠了錢就沒事了，現在換到附近另一間。'},
+  {lv:2, t:'我值夜班時他每晚都來，用手機對著我拍，還一路跟到我下班的路上。'},
+  {lv:2, t:'他從女廁隔間上方伸手機進來偷拍，被發現就跑了，警察說找不到人。'},
+  {lv:2, t:'他用 AI 把我的照片合成裸照，傳給我全部的同事和家人。'},
+  {lv:2, t:'圖書館裡他坐在我對面，在桌子底下一邊看著我一邊自慰。'},
+  {lv:2, t:'他偷走我晾在陽台的內衣褲，傳照片給我看他穿在身上的樣子。'},
+  {lv:2, m:1, t:'他在補習班電梯裡故意擠過來摸女學生的腰，補習班說他是「老客戶的家長」，不處理。'},
+  {lv:2, m:1, t:'他在網路上假裝是同年紀的男生，騙我傳照片，現在用那些照片威脅我出去見他。'},
+  {lv:2, t:'計程車上他一直問我的性經驗，還故意把車開到沒有人的河堤才停。'},
+  // ── 重（極度噁心）──
+  {lv:3, t:'他在擠滿人的捷運上對著我的裙子射精，我回到家才發現，警察說只能告公然猥褻。'},
+  {lv:3, t:'他把精液擠進我放在辦公桌上的水壺，監視器全拍到了，最後只判了毀損。'},
+  {lv:3, t:'他在女廁天花板裝針孔，拍了上百個女生，影片賣到海外網站，只關幾個月就出來了。'},
+  {lv:3, t:'他半夜爬到我家窗外，一邊看我睡覺一邊自慰，鄰居拍到報警，他隔週又來了。'},
+  {lv:3, t:'他在夜店對我的酒下藥，我醒來時在他車上，衣服被脫掉一半。檢察官說證據不足。'},
+  {lv:3, t:'他每天寄用過的保險套到我公司，附上寫著我名字的紙條。'},
+  {lv:3, t:'他在公車上拉開褲子拉鍊，抓著我的手往他的下體按，司機假裝沒看到。'},
+  {lv:3, t:'他是我的房東，在浴室裝攝影機，還拿影片威脅我陪他睡，不然就公開。'},
+  {lv:3, t:'他在網路上散布我的私密影片和住址，留言叫大家「去找她」，已經有陌生人半夜來敲門。'},
+  {lv:3, t:'電影院裡他從後座伸手摸我的胸部，我大叫之後，他還舔了舔手指對我笑。'},
+  {lv:3, t:'診所的男醫師看診時藉故要我脫衣服，用手機偷拍，被檢舉後他現在還在執業。'},
+  {lv:3, t:'他在 KTV 包廂把我壓在沙發上強吻、亂摸，其他人在旁邊錄影大笑。'},
+  {lv:3, t:'他在我的機車座墊上留下精液，連續一個月，每天都換不同的地方停也一樣。'},
+];
+const SEV_BONUS = [0, 0, 500, 1200];   // 情節越重，委託人湊得越多
+let recentInc = [];   // 避免短時間內重複出現同一則
+function pickIncident(minor){
+  const used = new Set([...recentInc, ...jobs.map(j=>j.inc)]);
+  let pool = INCIDENTS.map((x,i)=>i).filter(i=>(!minor || INCIDENTS[i].m) && !used.has(i));
+  if(!pool.length) pool = INCIDENTS.map((x,i)=>i).filter(i=>!minor || INCIDENTS[i].m);
+  const i = pick(pool);
+  recentInc.push(i); if(recentInc.length>18) recentInc.shift();
+  return i;
+}
+const DIFF = [   // 難度 1~3 星；twins = 上衣帽子完全一樣、只有體型年齡不同的「撞衫」路人
+  null,
+  {time:210, peds:60,  decoys:6,  twins:0, windMax:4,  pay:[2500,4000]},
+  {time:180, peds:85,  decoys:10, twins:2, windMax:7,  pay:[4500,6500]},
+  {time:150, peds:110, decoys:16, twins:4, windMax:10, pay:[7000,9500]},
+];
+/* 委託條件：依序要命中的部位。任何部位、任何順序、可重複，也可以先打死再繼續打（鞭屍）。
+   全部依序命中、而且噁男最後是死的，才算完全達成。 */
+const REQ_FIXED = {
+  1: [ {steps:['head'], say:'一槍爆頭。'},
+       {steps:['chest'], say:'胸口一槍，乾淨俐落。'},
+       {steps:['groin'], say:'打爛他的胯下，之後隨你。'},
+       {steps:['neck'], say:'打穿他的喉嚨，讓他再也發不出那些噁心的聲音。'},
+       {steps:['head','groin'], say:'先爆頭，再往他胯下補一槍。'} ],
+  2: [ {steps:['rhand','head'], say:'先打穿他拿手機偷拍的右手，再爆頭。'},
+       {steps:['lknee','rknee'], say:'打碎他兩邊膝蓋，看他還怎麼跟蹤。'},
+       {steps:['groin','head'], say:'先打他胯下，讓他痛，再爆頭。'},
+       {steps:['head','lhand','rhand'], say:'先爆頭。然後兩隻手掌，一隻都不要留。'},
+       {steps:['lfoot','rfoot','chest'], say:'先打他兩隻腳掌，讓他跑不掉，再打胸口。'} ],
+  3: [ {steps:['lcalf','rcalf','groin','head'], say:'兩條小腿、胯下，最後爆頭。一個都不能錯。'},
+       {steps:['head','lhand','rhand','groin'], say:'先爆頭，然後兩隻手掌、胯下，一個都不要放過。'},
+       {steps:['groin','groin','groin','chest'], say:'胯下三槍，最後胸口。'},
+       {steps:['neck','lknee','rknee','lfore','rfore'], say:'先打喉嚨，再把他的膝蓋和前臂一個一個打爛。'},
+       {steps:['rhand','rfore','rupper','rshould','head'], say:'從他的右手掌開始，一路往上打到肩膀，最後爆頭。'} ],
+};
+const ALL_PARTS = PARTS.map(p=>p.id);
+function makeReq(stars){
+  if(Math.random()<0.5) return pick(REQ_FIXED[stars]);
+  // 隨機組合：★ 1~2 步、★★ 2~3 步、★★★ 3~5 步；任何部位，偶爾重複同一處
+  const n = stars===1 ? pick([1,1,2]) : stars===2 ? pick([2,3]) : pick([3,4,5]);
+  const steps = [];
+  for(let i=0;i<n;i++) steps.push(i>0 && Math.random()<0.15 ? steps[i-1] : pick(ALL_PARTS));
+  return {steps, say:'照這個順序：' + steps.map(s=>PART[s].nm).join(' → ') + '。'};
+}
+const reqChain = steps => steps.map(s=>PART[s].nm).join(' → ');
+
+let jobs = [];
+function makeJob(){
+  const keys = Object.keys(DISTRICTS);
+  const stars = save.rep < 20 ? pick([1,1,2]) : save.rep < 60 ? pick([1,2,2,3]) : pick([2,3,3]);
+  const D = DIFF[stars];
+  const cl = pick(CLIENTS), inc = pickIncident(cl.minor), lv = INCIDENTS[inc].lv;
+  return {
+    id: Math.random().toString(36).slice(2,8),
+    client: cl.n, inc, msg: INCIDENTS[inc].t, sev: lv, district: pick(keys), stars,
+    shirt: pick(SHIRTS), hat: pick(HATS.slice(1)),   // 噁男一定戴帽子
+    body: randBody(),
+    req: makeReq(stars),
+    pay: Math.round((rand(D.pay[0], D.pay[1]) + SEV_BONUS[lv])/100)*100,
+  };
+}
+const JOB_COUNT = 6;
+function refreshJobs(){ jobs = []; for(let i=0;i<JOB_COUNT;i++) jobs.push(makeJob()); }
+const SHIRTS = [
+  {n:'紅色',c:'#e53935'},{n:'藍色',c:'#1e63d6'},{n:'綠色',c:'#2e9e44'},{n:'黃色',c:'#fdd835'},
+  {n:'白色',c:'#f4f4f4'},{n:'黑色',c:'#1c1c1c'},{n:'紫色',c:'#8e24aa'},{n:'橘色',c:'#fb8c00'},
+];
+const SKIN = '#d9a273';
+const HATS = [
+  {n:'沒戴帽子',c:SKIN},{n:'白色帽子',c:'#ffffff'},{n:'黑色帽子',c:'#000000'},
+  {n:'紅色帽子',c:'#ff1744'},{n:'黃色帽子',c:'#ffea00'},{n:'藍色帽子',c:'#2979ff'},
+];
+
+/* ---------- 工具 ---------- */
+const $ = id => document.getElementById(id);
+const rand = (a,b) => a + Math.random()*(b-a);
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+let LAT0 = 0, MLAT = 111320, MLNG = 111320;
+function setOrigin(lat){ LAT0 = lat; MLNG = 111320*Math.cos(lat*Math.PI/180); }
+const meters = (a,b) => Math.hypot((a[0]-b[0])*MLAT, (a[1]-b[1])*MLNG);
+function log(t, color){ const el=$('log'); el.textContent=t; el.style.color=color||''; }
+
+/* ---------- 地圖 ---------- */
+const map = L.map('map', {
+  zoomControl:false, attributionControl:true,
+  maxBoundsViscosity:1.0,   // 邊界是硬牆：不回彈、不自動拉回
+  scrollWheelZoom:'center', doubleClickZoom:'center', touchZoom:'center',
+  minZoom:15, maxZoom:24, zoomSnap:1, inertia:true, keyboard:false,
+});
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxNativeZoom:19, maxZoom:24,   // ×20 以上是數位放大（衛星圖會變糊，但人物是向量圖，仍然清楚）
+  attribution:'衛星圖 &copy; Esri, Maxar, Earthstar Geographics｜道路 &copy; OpenStreetMap 貢獻者',
+}).addTo(map);
+
+function zoomStyle(){
+  const z = map.getZoom();
+  const S = {15:2,16:3,17:5,18:8,19:13,20:22,21:34};
+  const el = map.getContainer();
+  el.style.setProperty('--s', (S[z]||34)+'px');
+  el.style.setProperty('--m', (1/metersPerPx()).toFixed(3));
+  el.classList.remove('d0','d1','d2','d3');
+  el.classList.add(z<18 ? 'd0' : z<19 ? 'd1' : z<21 ? 'd2' : 'd3');   // ×21 以上顯示人形與部位
+  $('scope').classList.toggle('on', z>=19);
+  $('hZoom').textContent = '×'+z;
+  $('zoomtag').textContent = z<18 ? '倍率不足：放大到 ×18 才能射擊' : '';
+  drawReticle(); updRange();
+}
+/* ---------- 地圖邊界 ----------
+   準星（畫面中心）可以移動到邊界框內任何一點。
+   maxBounds 依目前倍率往外加半個畫面，這樣 Leaflet 在縮放後不會為了「讓整個畫面留在框內」而偷偷移動中心點。 */
+let playRect = null, boundLayer = null;
+function setPlayArea(c){
+  const pad = SHOOTER_MAX + 200;
+  playRect = [[c[0]-pad/MLAT, c[1]-pad/MLNG],[c[0]+pad/MLAT, c[1]+pad/MLNG]];
+  if(boundLayer) map.removeLayer(boundLayer);
+  const [[s,w],[n,e]] = playRect;
+  const world = [[-89,-179.9],[-89,179.9],[89,179.9],[89,-179.9]];
+  const hole  = [[s,w],[n,w],[n,e],[s,e]];
+  boundLayer = L.layerGroup([
+    L.polygon([world, hole], {stroke:false, fillColor:'#000', fillOpacity:.62, interactive:false}),
+    L.polygon(hole, {color:'#ff3b3b', weight:3, opacity:.95, fill:false, dashArray:'14 8', interactive:false}),
+    L.circle(c, {radius:RADIUS_M, color:'#ffd54a', weight:2.5, opacity:.9, dashArray:'6 8', fill:false, interactive:false}),
+  ]).addTo(map);
+  updMaxBounds();
+}
+function updMaxBounds(){
+  if(!playRect) return;
+  const sz = map.getSize(), mpp = metersPerPx()*1.1;
+  const dy = sz.y/2*mpp/MLAT, dx = sz.x/2*mpp/MLNG;
+  const [[s,w],[n,e]] = playRect;
+  map.setMaxBounds([[s-dy, w-dx],[n+dy, e+dx]]);
+}
+// Leaflet 預設在縮放時會把「整個畫面」推回框內，造成準星偏移。改成只限制中心點（準星）本身。
+map._limitCenter = function(center){
+  if(!playRect) return center;
+  const ll = L.latLng(center), [[s,w],[n,e]] = playRect;
+  return L.latLng(Math.min(n,Math.max(s,ll.lat)), Math.min(e,Math.max(w,ll.lng)));
+};
+map.on('zoomend', updMaxBounds);   // 拖曳的硬牆：依新倍率重算
+map.on('resize', updMaxBounds);
+map.on('zoomend', zoomStyle);
+map.on('move', ()=>updRange());
+
+/* ---------- 準星刻度 ---------- */
+let tickStep = 1;
+function metersPerPx(){ return 156543.03392*Math.cos(LAT0*Math.PI/180)/Math.pow(2,map.getZoom()); }
+function drawReticle(){
+  const mpp = metersPerPx();
+  tickStep = [0.1,0.2,0.5,1,2,5,10,20,50,100].find(s=>s/mpp>=12) || 100;
+  const px = tickStep/mpp, C=120;
+  let s = `<g stroke="#ff2b2b" stroke-width="1.5" fill="none" opacity=".95">
+    <circle cx="${C}" cy="${C}" r="10"/>
+    <line x1="${C}" y1="0" x2="${C}" y2="${C-14}"/><line x1="${C}" y1="${C+14}" x2="${C}" y2="240"/>
+    <line x1="0" y1="${C}" x2="${C-14}" y2="${C}"/><line x1="${C+14}" y1="${C}" x2="240" y2="${C}"/>`;
+  for(let i=1; i*px<=C-4; i++){
+    const d=i*px, L=(i%5===0)?7:4;
+    s += `<line x1="${C+d}" y1="${C-L}" x2="${C+d}" y2="${C+L}"/><line x1="${C-d}" y1="${C-L}" x2="${C-d}" y2="${C+L}"/>`;
+    s += `<line x1="${C-L}" y1="${C+d}" x2="${C+L}" y2="${C+d}"/><line x1="${C-L}" y1="${C-d}" x2="${C+L}" y2="${C-d}"/>`;
+  }
+  s += `</g><circle cx="${C}" cy="${C}" r="1.6" fill="#ff2b2b"/>
+    <text x="236" y="${C-8}" fill="#ffb3b3" font-size="10" text-anchor="end" font-family="Consolas,monospace">1格=${tickStep}m</text>`;
+  $('cross').innerHTML = s;
+}
+
+/* ---------- 狙擊位置、距離、風 ---------- */
+let shooter = null, shooterMk = null, aimLine = null;
+let wind = {spd:0, dir:0, tSpd:0, tDir:0, next:0};   // dir：風吹去的方向（度，0=北，順時針）
+const vec = (from,to) => [(to[1]-from[1])*MLNG, (to[0]-from[0])*MLAT];  // [東, 北] 公尺
+function windVec(){ const r=wind.dir*Math.PI/180; return [Math.sin(r)*wind.spd, Math.cos(r)*wind.spd]; }
+function ballistics(aim){
+  const v = vec(shooter, aim), dist = Math.hypot(v[0],v[1]) || 1;
+  const u = [v[0]/dist, v[1]/dist], w = windVec();
+  const along = w[0]*u[0] + w[1]*u[1];
+  const cross = [w[0]-along*u[0], w[1]-along*u[1]];          // 只有橫風會造成偏移
+  const tof = dist/U('barrel');
+  const drift = [cross[0]*tof*WIND_K, cross[1]*tof*WIND_K];
+  return {dist, tof, drift, driftM:Math.hypot(drift[0],drift[1]), crossSpd:Math.hypot(cross[0],cross[1])};
+}
+function compass(deg){ return ['北','東北','東','東南','南','西南','西','西北'][Math.round(((deg%360)+360)%360/45)%8]; }
+let windMax = 7;
+function initWind(max){
+  windMax = max;
+  wind.dir = wind.tDir = Math.random()*360;
+  wind.spd = wind.tSpd = rand(max*0.15, max*0.8);
+  wind.next = rand(6,12);
+}
+function stepWind(dt){
+  wind.next -= dt;
+  if(wind.next<=0){ wind.next=rand(6,12); wind.tSpd=Math.max(0,Math.min(windMax,wind.tSpd+rand(-2.5,2.5))); wind.tDir+=rand(-35,35); }
+  wind.spd += (wind.tSpd-wind.spd)*Math.min(1,dt*0.5);
+  wind.dir += (wind.tDir-wind.dir)*Math.min(1,dt*0.5);
+}
+function updRange(){
+  const el=$('rangetag'), ap=$('aimpt');
+  ap.classList.add('hidden');
+  if(!shooter || state!=='play'){ el.innerHTML=''; return; }
+  const c=map.getCenter(), aim=[c.lat,c.lng];
+  if(aimLine) aimLine.setLatLngs([shooter, aim]);
+  const b=ballistics(aim);
+  if(b.dist>MAX_RANGE){ el.innerHTML=`<span class="bad">距離 ${b.dist.toFixed(0)} m．超出有效射程 ${MAX_RANGE} m</span>`; return; }
+  const comp = U('comp');
+  let s = `距離 <b>${b.dist.toFixed(0)}</b> m．飛行 <b>${b.tof.toFixed(2)}</b> s`;
+  if(comp>=1){
+    const ang = Math.atan2(b.drift[0], b.drift[1])*180/Math.PI;   // 偏移方向（地圖北朝上）
+    s += `<br>風偏 <b>${b.driftM.toFixed(1)}</b> m <span class="arw" style="transform:rotate(${ang}deg)">↑</span>（約 ${(b.driftM/tickStep).toFixed(1)} 格）`;
+  }
+  if(comp>=2 && map.getZoom()>=18){
+    // 子彈落點 = 準星 + 風偏，所以把噁男放在「準星 + 風偏」的位置（藍點）就會命中（螢幕 y 軸向下，北為負）
+    const mpp = metersPerPx();
+    ap.style.left = `calc(50% + ${b.drift[0]/mpp}px)`;
+    ap.style.top  = `calc(50% - ${b.drift[1]/mpp}px)`;
+    ap.classList.remove('hidden');
+    s += '<br><span style="color:#38d9ff">把噁男對準藍點開槍</span>';
+  }
+  el.innerHTML = s;
+}
+function placeShooter(c, pool){
+  if(shooterMk) map.removeLayer(shooterMk);
+  if(aimLine) map.removeLayer(aimLine);
+  // 優先放在道路節點上（像是站在某棟建築或街角），離中心 SHOOTER_MIN~MAX
+  const cand = (pool||graph).filter(n=>{ const d=meters(n.ll,c); return d>=SHOOTER_MIN && d<=SHOOTER_MAX; });
+  if(cand.length) shooter = pick(cand).ll.slice();
+  else { const a=Math.random()*Math.PI*2, d=rand(SHOOTER_MIN,SHOOTER_MAX); shooter=[c[0]+Math.cos(a)*d/MLAT, c[1]+Math.sin(a)*d/MLNG]; }
+  shooterMk = L.marker(shooter,{icon:L.divIcon({className:'pedicon',iconSize:[0,0],html:'<div class="shooter"></div>'}),interactive:false}).addTo(map);
+  aimLine = L.polyline([shooter, shooter],{color:'#7fd8ff',weight:1.5,opacity:.55,dashArray:'6 6',interactive:false}).addTo(map);
+}
+
+/* ---------- 道路網 ---------- */
+/* 街道資料來源：OpenStreetMap 的 Overpass 公開伺服器（免費、共用、可能要排隊）。
+   主伺服器 4 秒沒回應就加開下一台備用伺服器，先回應的勝出，其他取消。 */
+const OVERPASS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+];
+async function fetchOverpass(q, prog){
+  const ctrls = []; let winner = null, started = 0;
+  const tryOne = async (url, delay) => {
+    await new Promise(r=>setTimeout(r, delay));
+    if(winner) throw new Error('skip');
+    const ac = new AbortController(); ctrls.push(ac); started++;
+    const host = new URL(url).host;
+    prog('wait', {host, n:started});
+    const res = await fetch(url, {method:'POST', body:'data='+encodeURIComponent(q),
+      headers:{'Content-Type':'application/x-www-form-urlencoded'}, signal:ac.signal});
+    if(!res.ok) throw new Error(host+' '+res.status);
+    if(winner) throw new Error('late');
+    winner = ac; ctrls.forEach(c=>c!==ac && c.abort());
+    const reader = res.body.getReader(), chunks = []; let got = 0;
+    for(;;){ const {done, value} = await reader.read(); if(done) break; chunks.push(value); got += value.length; prog('dl', {host, got}); }
+    return JSON.parse(await new Blob(chunks).text());
+  };
+  const timer = setTimeout(()=>ctrls.forEach(c=>c.abort()), 35000);
+  try { return await Promise.any(OVERPASS.map((u,i)=>tryOne(u, i*4000))); }
+  finally { clearTimeout(timer); }
+}
+/* ---------- 內建行政區資料 ----------
+   data/<key>.js 由 tools/build-roads.mjs 產生，內含區界（b）與整區路網（p 座標、w 道路）。
+   用 <script> 載入，直接開 file:// 也能用，不需要伺服器。 */
+const districtData = {};
+function loadScriptOnce(src){
+  return new Promise((ok,ng)=>{ const s=document.createElement('script'); s.src=src; s.onload=ok;
+    s.onerror=()=>{ s.remove(); ng(new Error('載入失敗 '+src)); }; document.head.appendChild(s); });
+}
+async function loadScript(src){   // 偶發連線中斷時自動重試
+  for(let i=0;i<3;i++){
+    try{ return await loadScriptOnce(i ? `${src}?retry=${i}` : src); }
+    catch(e){ if(i===2) throw e; await new Promise(r=>setTimeout(r, 400*(i+1))); }
+  }
+}
+function decPts(arr, base){
+  const out=[]; let la=Math.round(base[0]*1e6), lg=Math.round(base[1]*1e6);
+  for(let i=0;i<arr.length;i+=2){ la+=arr[i]; lg+=arr[i+1]; out.push([la/1e6, lg/1e6]); }
+  return out;
+}
+async function loadDistrict(key, prog){
+  if(districtData[key]) return districtData[key];
+  prog('bundled');
+  if(!(window.SK_ROADS && SK_ROADS[key])) await loadScript('data/'+key+'.js');
+  const d = SK_ROADS[key];
+  prog('build'); await new Promise(r=>setTimeout(r,30));
+  const nodes = decPts(d.p, d.c).map(ll=>({ll, adj:[]}));
+  for(const w of d.w){
+    let idx=0, prev=-1;
+    for(const dv of w){ idx+=dv; if(prev>=0 && prev!==idx){ nodes[prev].adj.push(nodes[idx]); nodes[idx].adj.push(nodes[prev]); } prev=idx; }
+  }
+  return districtData[key] = {c:d.c, rings:d.b.map(r=>decPts(r, d.c)), nodes:nodes.filter(n=>n.adj.length)};
+}
+function inRings(ll, rings){   // 射線法判斷點是否在行政區內
+  let inside=false;
+  for(const r of rings) for(let i=0,j=r.length-1;i<r.length;j=i++){
+    const [yi,xi]=r[i], [yj,xj]=r[j];
+    if((yi>ll[0])!==(yj>ll[0]) && ll[1] < (xj-xi)*(ll[0]-yi)/(yj-yi)+xi) inside=!inside;
+  }
+  return inside;
+}
+// 在行政區內隨機挑一個狙擊場中心。用「路口數」判斷是不是市區：
+// 實測信義區市區 200~560 個路口，象山等山區步道只有 60~90 個（山路節點多但路口少）。
+const MIN_INTERSECTIONS = 180;
+function pickZone(D){
+  if(!D.inter) D.inter = D.nodes.filter(n=>new Set(n.adj).size>=3).map(n=>n.ll);
+  const dLat=RADIUS_M/MLAT, dLng=RADIUS_M/MLNG;
+  let best=null, bestN=-1;
+  for(let t=0;t<150;t++){
+    const c = pick(D.inter.length ? D.inter : D.nodes.map(n=>n.ll));
+    if(!inRings(c, D.rings)) continue;
+    let n=0;
+    for(const v of D.inter) if(Math.abs(v[0]-c[0])<dLat && Math.abs(v[1]-c[1])<dLng && meters(v,c)<=RADIUS_M) n++;
+    if(n>bestN){ best=c; bestN=n; }
+    if(n>=MIN_INTERSECTIONS) break;
+  }
+  return best;
+}
+// 從整區路網切出狙擊場範圍內（且在行政區內）的子路網
+function zoneGraph(D, c){
+  const keep = new Set(D.nodes.filter(n=>meters(n.ll,c)<=RADIUS_M+60 && inRings(n.ll, D.rings)));
+  const sub = new Map();
+  for(const n of keep) sub.set(n, {ll:n.ll, adj:new Set()});
+  for(const n of keep) for(const m of n.adj) if(keep.has(m) && m!==n) sub.get(n).adj.add(sub.get(m));
+  return largestComponent([...sub.values()].filter(n=>n.adj.size));
+}
+async function loadRoadsOnline(c, prog){   // 內建資料缺漏時的備援：即時向 Overpass 查詢
+  const q = `[out:json][timeout:25];
+way["highway"~"^(footway|pedestrian|residential|living_street|service|tertiary|secondary|primary|unclassified|path|steps)$"](around:${RADIUS_M},${c[0]},${c[1]});
+(._;>;);out skel qt;`;
+  const js = await fetchOverpass(q, prog);
+  prog('build');
+  return buildGraph(js, c);
+}
+function buildGraph(js, c){
+  const nodes = new Map();
+  for(const e of js.elements) if(e.type==='node') nodes.set(e.id, {ll:[e.lat,e.lon], adj:new Set()});
+  for(const e of js.elements) if(e.type==='way'){
+    for(let i=1;i<e.nodes.length;i++){
+      const a=nodes.get(e.nodes[i-1]), b=nodes.get(e.nodes[i]);
+      if(a&&b&&a!==b){ a.adj.add(b); b.adj.add(a); }
+    }
+  }
+  // 只保留目標活動區內的節點（Overpass 會回傳整條路，可能延伸很遠）
+  for(const n of nodes.values()) if(meters(n.ll,c) > RADIUS_M+60) n.out = true;
+  for(const n of nodes.values()) for(const m of [...n.adj]) if(m.out) n.adj.delete(m);
+  return largestComponent([...nodes.values()].filter(n=>!n.out && n.adj.size));
+}
+function largestComponent(list){
+  const seen=new Set(); let best=[];
+  for(const s of list){
+    if(seen.has(s)) continue;
+    const comp=[s]; seen.add(s);
+    for(let i=0;i<comp.length;i++) for(const n of comp[i].adj) if(!seen.has(n)){ seen.add(n); comp.push(n); }
+    if(comp.length>best.length) best=comp;
+  }
+  // 重新包裝成新節點，鄰居也要換成新節點（否則行人走到下一段會拿到舊物件）
+  const map2 = new Map(best.map(n=>[n, {ll:n.ll, adj:[]}]));
+  for(const n of best) map2.get(n).adj = [...new Set(n.adj)].filter(m=>map2.has(m)).map(m=>map2.get(m));
+  return [...map2.values()];
+}
+function fallbackGrid(c){   // 抓不到道路時，用棋盤街道
+  const N=11, step=80, g=[];
+  for(let i=0;i<N;i++){ g[i]=[]; for(let j=0;j<N;j++)
+    g[i][j]={ll:[c[0]+(i-5)*step/MLAT, c[1]+(j-5)*step/MLNG], adj:[]}; }
+  for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+    if(i+1<N){ g[i][j].adj.push(g[i+1][j]); g[i+1][j].adj.push(g[i][j]); }
+    if(j+1<N){ g[i][j].adj.push(g[i][j+1]); g[i][j+1].adj.push(g[i][j]); }
+  }
+  return g.flat();
+}
+
+/* ---------- 遊戲狀態 ---------- */
+let graph=[], peds=[], target=null, state='idle', timeLeft=0, ammo=0, civKills=0, reloading=false, pending=0;
+let job=null, magSize=5, shotsFired=0, reconLayer=null, reconTimer=0;
+let seqDone=0, seqOk=true;   // 委託條件進度：已依序完成幾步、是否仍符合條件
+function renderReq(){
+  const st = job.req.steps;
+  $('dReq').innerHTML = '要求：' + st.map((s,i)=>{
+    const nm = PART[s].nm;
+    if(i<seqDone) return `<span style="color:var(--accent)">✔${nm}</span>`;
+    if(!seqOk) return `<span style="color:var(--warn);text-decoration:line-through">${nm}</span>`;
+    if(i===seqDone) return `<span style="color:#ffd54a;font-weight:bold">▶${nm}</span>`;
+    return `<span style="opacity:.6">${nm}</span>`;
+  }).join(' → ') + (seqOk ? '' : '<br><span style="color:var(--warn)">條件已破，只能拿部分酬勞</span>');
+}
+
+function makeIcon(p, pants){
+  const hasHat = p.hat !== HATS[0], hair = p.hair, hatC = hasHat ? p.hat.c : hair;
+  const svg = FIG_SVG.replace('__SX__', (BODY_SCALE*p.sx).toFixed(3)).replace('__SY__', (BODY_SCALE*p.sy).toFixed(3));
+  return L.divIcon({className:'pedicon', iconSize:[0,0],
+    html:`<div class="pw${hasHat?'':' nohat'}" style="--k:${Math.sqrt(p.sx*p.sy).toFixed(2)};--shirt:${p.shirt.c};--shirt2:color-mix(in srgb,${p.shirt.c} 75%,#000);--hat:${hatC};--hair:${hair};--pants:${pants};--pants2:color-mix(in srgb,${pants} 70%,#000);--skin:${SKIN};--skin2:#c98d5e;--shoe:#222"><div class="ped"><i></i></div>${svg}</div>`});
+}
+function setEdge(p, a, b){
+  p.a=a; p.b=b; p.len=Math.max(meters(a.ll,b.ll),0.01); p.t=0;
+  const v = vec(a.ll, b.ll);
+  p.hd = Math.atan2(v[0], v[1]);   // 面朝方向：0 = 北，順時針（弧度）
+  if(p.fig) p.fig.style.transform = `rotate(${p.hd}rad)`;
+}
+function spawnPed(shirt, hat, isTarget, body){
+  const a = pick(graph), b = pick(a.adj);
+  body = body || randBody();
+  const AG = AGES[body.a];
+  const p = {shirt, hat, isTarget, body, alive:true, down:false, panic:0, wait:0,
+    base: rand(AG.spd[0], AG.spd[1]),                       // 年齡決定走路速度
+    sx: BUILDS[body.b].sx, sy: HEIGHTS[body.h].sy*AG.sy,     // 體型決定外觀與命中判定
+    hair: pick(AG.hair)};
+  setEdge(p, a, b); p.t = Math.random()*p.len;
+  p.ll = lerp(p);
+  p.m = L.marker(p.ll, {icon:makeIcon(p, pick(PANTS)), interactive:false, keyboard:false}).addTo(map);
+  const el = p.m.getElement();
+  p.root = el.firstChild; p.fig = el.querySelector('.fig');
+  p.fig.style.transform = `rotate(${p.hd}rad)`;
+  peds.push(p); return p;
+}
+// 命中判定：把落點換算到角色的局部座標，看打到哪個部位
+function hitPart(p, ll){
+  const d = vec(p.ll, ll), c = Math.cos(p.hd), s = Math.sin(p.hd);
+  // 換回基準尺寸（除以整體倍率與這個人的體型倍率，和 SVG 的 scale 完全對應）
+  const x = (d[0]*c - d[1]*s)/(BODY_SCALE*p.sx), y = (d[0]*s + d[1]*c)/(BODY_SCALE*p.sy);
+  if(Math.hypot(x,y) > 1.1) return null;
+  const part = partAtLocal(x,y);
+  return part ? {part, x, y} : null;
+}
+function addWound(p, x, y){
+  const g = p.fig.querySelector('.body');
+  const w = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  w.setAttribute('cx', x); w.setAttribute('cy', -y); w.setAttribute('r', 0.035); w.setAttribute('class','wound');
+  g.appendChild(w);
+}
+function lerp(p){ const k=p.t/p.len; return [p.a.ll[0]+(p.b.ll[0]-p.a.ll[0])*k, p.a.ll[1]+(p.b.ll[1]-p.a.ll[1])*k]; }
+function nextEdge(p){
+  const from=p.b; let opts=from.adj.filter(n=>n!==p.a);
+  if(!opts.length) opts=from.adj;
+  setEdge(p, from, pick(opts));
+  if(p.panic<=0 && Math.random()<0.12) p.wait=rand(2,7);   // 偶爾停下來
+}
+
+function setupRound(){
+  peds.forEach(p=>map.removeLayer(p.m)); peds=[];
+  const D = DIFF[job.stars], tShirt=job.shirt, tHat=job.hat;
+  target = spawnPed(tShirt, tHat, true, job.body);
+  // 撞衫：上衣帽子完全一樣，體型年齡三項中只差一項，只能靠身高、胖瘦、年齡（頭髮、走路速度）分辨
+  const NOPT = {h:HEIGHTS.length, b:BUILDS.length, a:AGES.length};
+  for(let i=0;i<D.twins;i++){
+    const bd = {...job.body}, k = ['h','b','a'][i%3];
+    bd[k] = (bd[k] + 1 + Math.floor(Math.random()*(NOPT[k]-1))) % NOPT[k];   // 換成另一個值
+    spawnPed(tShirt, tHat, false, bd);
+  }
+  // 誘餌：相同上衣或相同帽子
+  for(let i=0;i<D.decoys;i++){
+    let s,h;
+    if(i%2){ s=tShirt; do{h=pick(HATS);}while(h===tHat); }
+    else   { h=tHat;   do{s=pick(SHIRTS);}while(s===tShirt); }
+    spawnPed(s,h,false);
+  }
+  while(peds.length<D.peds){
+    let s=pick(SHIRTS), h=Math.random()<0.55?HATS[0]:pick(HATS);
+    if(s===tShirt && h===tHat) continue;
+    spawnPed(s,h,false);
+  }
+  peds.sort(()=>Math.random()-.5);
+  // 檔案
+  const pv=$('dPv'); pv.style.setProperty('--shirt',tShirt.c); pv.style.setProperty('--hat',tHat.c);
+  $('dTxt').innerHTML = `上衣：<b>${tShirt.n}</b><br>帽子：<b>${tHat.n}</b><br>外型：<b>${bodyText(job.body)}</b>`
+    + (D.twins ? `<br><span style="color:#ffb74d">⚠ 現場有 ${D.twins} 個撞衫的人</span>` : '');
+  $('dJob').textContent = `委託人：${job.client}｜${'★'.repeat(job.stars)}｜${money(job.pay)}`;
+  magSize = Math.min(U('mag'), save.ammo);
+  timeLeft=D.time; ammo=magSize; shotsFired=0; civKills=0; reloading=false; pending=0;
+  seqDone=0; seqOk=true; renderReq();
+  if(reconLayer){ map.removeLayer(reconLayer); reconLayer=null; }
+  reconTimer = 0; if(U('recon')>=1) reconPing();
+  updHud();
+}
+// 監視器入侵：在噁男附近（不是正中心）畫一個大概範圍
+function reconPing(){
+  if(!target || !target.alive) return;
+  if(reconLayer) map.removeLayer(reconLayer);
+  const a=Math.random()*Math.PI*2, r=rand(0,80);
+  const c=[target.ll[0]+Math.cos(a)*r/MLAT, target.ll[1]+Math.sin(a)*r/MLNG];
+  reconLayer = L.circle(c,{radius:120,color:'#ff4dff',weight:2,opacity:.9,fillColor:'#ff4dff',fillOpacity:.08,dashArray:'3 5',interactive:false}).addTo(map);
+  log('監視器畫面：噁男在紫色圈附近出沒', '#ff9dff');
+}
+
+function updHud(){
+  const t=Math.max(0,Math.ceil(timeLeft));
+  $('hTime').textContent = `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`;
+  $('hTime').style.color = t<=30 ? 'var(--warn)' : '';
+  $('hAmmo').textContent = '▮'.repeat(Math.max(0,ammo))+'▯'.repeat(Math.max(0,magSize-ammo));
+  $('hCiv').textContent = civKills;
+  $('hWind').textContent = `${wind.spd.toFixed(1)} m/s 吹向${compass(wind.dir)}`;
+  $('windArw').style.transform = `rotate(${wind.dir}deg)`;
+  $('fire').disabled = state!=='play' || ammo<=0 || reloading;
+  $('extract').classList.toggle('ready', state==='play' && !!target && !target.alive);
+  $('extract').textContent = (target && !target.alive) ? '收工撤離' : '撤離';
+}
+
+/* ---------- 主迴圈 ---------- */
+let last=performance.now(), hudAcc=0;
+function frame(now){
+  const dt=Math.min(0.1,(now-last)/1000); last=now;
+  if(state==='play'){
+    for(const p of peds){
+      if(!p.alive || p.down) continue;
+      if(p.wait>0 && p.panic<=0){ p.wait-=dt; continue; }
+      if(p.panic>0) p.panic-=dt;
+      let d=p.base*(p.panic>0 ? (p.isTarget?3.6:2.8) : 1)*dt;
+      while(d>0){ const rem=p.len-p.t; if(d<rem){p.t+=d; d=0;} else {d-=rem; nextEdge(p);} }
+      p.ll=lerp(p); p.m.setLatLng(p.ll);
+    }
+    timeLeft-=dt; hudAcc+=dt;
+    stepWind(dt);
+    if(U('recon')>=2){ reconTimer+=dt; if(reconTimer>=30){ reconTimer=0; reconPing(); } }
+    if(hudAcc>0.25){ hudAcc=0; updHud(); updRange(); }
+    if(timeLeft<=0){
+      if(!target.alive) endGame(true);   // 噁男已死：依完成度結算
+      else endGame(false,'時間到，噁男已經離開區域。');
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- 射擊 ---------- */
+let actx=null;
+function gunSound(){
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const len=actx.sampleRate*0.35, buf=actx.createBuffer(1,len,actx.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,4);
+    const src=actx.createBufferSource(), f=actx.createBiquadFilter(), g=actx.createGain();
+    f.type='lowpass'; f.frequency.value=1800; g.gain.value=0.8;
+    src.buffer=buf; src.connect(f).connect(g).connect(actx.destination); src.start();
+  }catch(e){}
+}
+function fire(){
+  if(state!=='play' || ammo<=0 || reloading) return;
+  if(map.getZoom()<18){ log('倍率不足，至少要放大到 ×18 才能射擊', 'var(--warn)'); return; }
+  const at=map.getCenter(), aim=[at.lat,at.lng];
+  const b=ballistics(aim);
+  if(b.dist>MAX_RANGE){ log(`超出有效射程（${b.dist.toFixed(0)} m > ${MAX_RANGE} m）`, 'var(--warn)'); return; }
+  ammo--; shotsFired++; save.ammo--; persist(); reloading=true; pending++;
+  // 實際落點 = 瞄準點 + 風偏 + 隨機散布（風偏在擊發瞬間決定）
+  const sd = SPREAD_PER_KM*b.dist/1000;
+  const g = () => { let u=0,v=0; while(!u)u=Math.random(); while(!v)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); };
+  const offE = b.drift[0] + g()*sd, offN = b.drift[1] + g()*sd;
+  const hit = [aim[0]+offN/MLAT, aim[1]+offE/MLNG];
+  gunSound();
+  const fl=$('flash'); fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go');
+  document.body.classList.remove('recoil'); void document.body.offsetWidth; document.body.classList.add('recoil');
+  log('砰！');
+  updHud();
+  setTimeout(()=>{ reloading=false; updHud(); }, 1300);
+  setTimeout(()=>resolveShot(hit, aim), b.tof*1000);
+}
+function resolveShot(aim, aimed){
+  pending--;
+  if(state!=='play') return;
+  const tracer = L.polyline([shooter, aim],{color:'#ffe08a',weight:2,opacity:.8,interactive:false}).addTo(map);
+  setTimeout(()=>map.removeLayer(tracer),350);
+  const off = meters(aim, aimed);
+  const imp=L.marker(aim,{icon:L.divIcon({className:'pedicon',iconSize:[0,0],html:'<div class="impact"></div>'}),interactive:false}).addTo(map);
+  setTimeout(()=>map.removeLayer(imp),900);
+
+  // 找出被打中的人與部位（倒地的噁男優先判定，其次離落點最近的人）
+  let best=null, bd=Infinity, hit=null;
+  for(const p of peds){
+    const d=meters(aim,p.ll); if(d<bd){ bd=d; }
+    if((!p.alive && !p.isTarget) || d>1.5) continue;   // 噁男的屍體也可以打（鞭屍）
+    const h = hitPart(p, aim);
+    if(h && (!hit || d < meters(aim,best.ll))){ hit=h; best=p; }
+  }
+  const PANIC_R = U('silencer');
+  for(const p of peds) if(p.alive && !p.down && meters(aim,p.ll)<PANIC_R){ p.panic=rand(5,9); p.wait=0; }
+
+  if(hit){
+    addWound(best, hit.x, hit.y);
+    if(best.isTarget){
+      const st = job.req.steps, part = hit.part;
+      let note = '';
+      if(seqDone < st.length){   // 要求全部完成後，多打的槍不影響條件
+        if(seqOk && part.id===st[seqDone]){ seqDone++; note = seqDone===st.length ? '　委託要求全部完成！' : '　✔ 符合要求'; }
+        else if(seqOk){ seqOk = false; note = `　✘ 委託要的是「${PART[st[seqDone]].nm}」`; }
+      }
+      const wasAlive = best.alive;
+      if(part.lethal && best.alive){ best.alive=false; best.down=true; best.root.classList.add('dead'); }
+      else if(best.alive) best.down = true;   // 非致命部位：倒地無法移動
+      renderReq();
+      const done = seqDone >= st.length;
+      if(!best.alive && (done || !seqOk)){ log(`命中噁男的${part.nm}。${note}`, done&&seqOk?'var(--accent)':'#ffcc66'); endGame(true); return; }
+      if(!best.alive) log(wasAlive ? `命中噁男的${part.nm}，他死了。但委託人的要求還沒完成，繼續。${note}` : `補槍：噁男屍體的${part.nm}。${note}`, 'var(--accent)');
+      else log(`命中噁男的${part.nm}！他倒在地上動不了了。${note}` + (done ? '　現在打頭部、頸部或胸口結束他。' : ''), seqOk ? 'var(--accent)' : '#ffcc66');
+    }else{
+      best.alive=false; best.root.classList.add('dead');
+      civKills++;
+      log(`誤傷路人（${best.shirt.n}上衣、${best.hat.n}）的${hit.part.nm}！酬勞 -${CIV_PAY_CUT*100}%、聲望 -${CIV_REP}`, 'var(--warn)');
+    }
+  }else{
+    const dt = target.alive ? meters(aim,target.ll) : Infinity;
+    const where = `落點偏離準星 ${off.toFixed(1)} m，離最近的人 ${bd.toFixed(1)} m`;
+    log(dt<PANIC_R ? `未命中，噁男受驚逃跑中！（${where}）` : `未命中（${where}）`, dt<PANIC_R ? '#ffcc66' : '');
+  }
+  updHud();
+  if(ammo<=0 && pending===0 && state==='play'){
+    if(!target.alive) endGame(true);   // 噁男已死：依完成度結算
+    else endGame(false,'彈藥用盡，任務失敗。');
+  }
+}
+function extract(){
+  if(state!=='play' || pending>0) return;
+  if(!target.alive) endGame(true);
+  else if(confirm('噁男還活著。確定放棄這件委託撤離？')) endGame(false,'你放棄了這件委託。');
+}
+
+/* ---------- 暗網終端 ---------- */
+const pedSwatch = (s,h) => `<span class="ped" style="--shirt:${s.c};--hat:${h.c}"><i></i></span>`;
+const mmss = t => `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`;
+let loading = false;
+function renderStats(){
+  $('sMoney').textContent = money(save.money);
+  $('sAmmo').textContent  = save.ammo + ' 發';
+  $('sRep').textContent   = save.rep;
+  $('sDone').textContent  = save.done + ' 件';
+}
+function renderJobs(){
+  // 防卡關：沒子彈也沒錢買時，黑市賒 3 發
+  let note = '';
+  if(save.ammo<=0 && save.money<AMMO_PRICE){ save.ammo=3; persist(); note='<div class="note" style="color:#ffd54a">黑市老朋友先賒你 3 發子彈。</div>'; }
+  const canGo = save.ammo>0 && !loading;
+  $('jobList').innerHTML = note + jobs.map(j=>{
+    const D=DIFF[j.stars];
+    return `<div class="job">
+      <div class="top"><span>來自：${j.client}　<span style="color:${['','#9fd39a','#ffb74d','#ff4d6d'][j.sev]}">[${['','輕','中','重'][j.sev]}]</span></span><span style="color:#ffd54a">${'★'.repeat(j.stars)}${'☆'.repeat(3-j.stars)}</span></div>
+      <div class="msg">「${j.msg}${j.req.say}」</div>
+      <div class="meta" style="margin-bottom:4px"><span>要求：<b style="color:#ff8fa3">${reqChain(j.req.steps)}</b></span></div>
+      <div class="meta">
+        <span>出沒：<b>台北市${DISTRICTS[j.district].name}</b></span>
+        <span>特徵：${pedSwatch(j.shirt,j.hat)} ${j.shirt.n}上衣、${j.hat.n}、${bodyText(j.body)}</span>
+        <span>時限 ${mmss(D.time)}．人潮 ${D.peds}．風速最高 ${D.windMax} m/s</span>
+        <span class="pay">酬勞 ${money(j.pay)}</span>
+      </div>
+      <button data-job="${j.id}" ${canGo?'':'disabled'}>接案</button>
+    </div>`;
+  }).join('') + (save.ammo>0 ? '' : '<div class="note" style="color:var(--warn)">沒有子彈了，先去軍火庫購買。</div>');
+}
+function renderShop(){
+  const row = (nm, lv, ds, btn) => `<div class="item"><div><div class="nm">${nm} <span class="lv">${lv}</span></div><div class="ds">${ds}</div></div><div>${btn}</div></div>`;
+  let h = row('狙擊子彈', `庫存 ${save.ammo} 發`, `每發 ${money(AMMO_PRICE)}。任務會帶上「彈匣容量」與庫存中較少的數量，打出去的才扣`,
+    `<button class="small" data-buy="1" ${save.money<AMMO_PRICE?'disabled':''}>買 1 發</button> <button class="small" data-buy="5" ${save.money<AMMO_PRICE*5?'disabled':''}>買 5 發</button>`);
+  for(const [k,u] of Object.entries(UPGRADES)){
+    const lv=save.up[k], max=u.vals.length-1;
+    const now = u.fmt(u.vals[lv]);
+    const next = lv<max ? `→ 下一級：${u.fmt(u.vals[lv+1])}` : '已達最高等級';
+    const btn = lv<max ? `<button class="small" data-up="${k}" ${save.money<u.cost[lv]?'disabled':''}>升級 ${money(u.cost[lv])}</button>` : '<span style="opacity:.5">MAX</span>';
+    h += row(u.nm, `Lv.${lv+1}`, `${now}<br>${next}`, btn);
+  }
+  $('shopList').innerHTML = h;
+}
+function renderTerminal(){ renderStats(); renderJobs(); renderShop(); }
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===name));
+  document.querySelectorAll('.tabpane').forEach(p=>p.classList.toggle('hidden', p.id!=='tab-'+name));
+}
+$('startBox').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b || b.disabled) return;
+  if(b.dataset.tab) showTab(b.dataset.tab);
+  else if(b.dataset.job){ const j=jobs.find(x=>x.id===b.dataset.job); if(j) startGame(j); }
+  else if(b.dataset.buy){ const n=+b.dataset.buy; if(save.money>=n*AMMO_PRICE){ save.money-=n*AMMO_PRICE; save.ammo+=n; persist(); renderTerminal(); } }
+  else if(b.dataset.up){ const k=b.dataset.up, u=UPGRADES[k], lv=save.up[k];
+    if(lv<u.vals.length-1 && save.money>=u.cost[lv]){ save.money-=u.cost[lv]; save.up[k]++; persist(); renderTerminal(); } }
+  else if(b.id==='refreshJobs'){ refreshJobs(); renderJobs(); }
+  else if(b.id==='resetSave'){ if(confirm('確定清除存檔？資金、子彈、裝備都會重置。')){ save=NEW_SAVE(); persist(); refreshJobs(); renderTerminal(); } }
+});
+
+/* 進度條：伺服器在查詢時不會回報進度，所以「排隊／查詢」階段用經過秒數推估，
+   開始收到資料後顯示實際下載量。 */
+function progressUI(){
+  const box=$('prog'), bar=$('progBar'), txt=$('progTxt');
+  box.classList.remove('hidden');
+  const t0=performance.now(); let phase='wait', info={host:'', n:1, got:0}, pct=0;
+  const render=()=>{
+    const s=((performance.now()-t0)/1000).toFixed(0);
+    if(phase==='wait'){
+      pct = 60*(1-Math.exp(-(performance.now()-t0)/9000));
+      txt.textContent = `等待伺服器回應（排隊／查詢中）… ${s} 秒` + (info.n>1?`｜已加開備用伺服器 ${info.n-1} 台`:'') + (info.host?`｜${info.host}`:'');
+    }else if(phase==='dl'){
+      pct = 60 + 30*(1-Math.exp(-info.got/250000));
+      txt.textContent = `下載街道資料中… ${(info.got/1024).toFixed(0)} KB｜${info.host}`;
+    }else if(phase==='build'){ pct=90; txt.textContent='建立路網、隨機挑選狙擊場…'; }
+    else if(phase==='bundled'){ pct=40; txt.textContent='載入內建行政區資料…'; }
+    bar.style.width = pct.toFixed(1)+'%';
+  };
+  const iv=setInterval(render, 200); render();
+  return {
+    update:(p,d)=>{ phase=p; if(d) Object.assign(info,d); render(); },
+    done:()=>{ clearInterval(iv); bar.style.width='100%'; setTimeout(()=>box.classList.add('hidden'), 300); },
+  };
+}
+
+let districtLayer = null;
+async function startGame(j){
+  job = j;
+  const key=j.district, dist=DISTRICTS[key];
+  loading = true; renderJobs();
+  $('loadMsg').textContent='';
+  map.setMaxZoom(U('scope'));
+  setOrigin(dist.c[0]);
+  map.setMaxBounds(null); playRect=null;
+  if(districtLayer){ map.removeLayer(districtLayer); districtLayer=null; }
+  const P = progressUI();
+  let zc, pool=null, warn='';
+  try{
+    const D = await loadDistrict(key, P.update);
+    zc = pickZone(D);
+    graph = zoneGraph(D, zc);
+    if(graph.length<30) throw new Error('道路太少');
+    pool = D.nodes.filter(n=>inRings(n.ll, D.rings));
+    districtLayer = L.polygon(D.rings, {color:'#ffffff', weight:2, opacity:.7, fill:false, dashArray:'2 6', interactive:false}).addTo(map);
+  }catch(e){
+    console.warn('內建資料不可用，改為即時查詢', e);
+    const a=Math.random()*Math.PI*2, r=rand(0,900);
+    zc=[dist.c[0]+Math.cos(a)*r/MLAT, dist.c[1]+Math.sin(a)*r/MLNG];
+    try{
+      graph = await loadRoadsOnline(zc, P.update);
+      if(graph.length<30) throw new Error('道路太少');
+    }catch(e2){
+      console.warn(e2);
+      graph = fallbackGrid(zc);
+      warn='街道資料取得失敗，改用模擬棋盤街道';
+    }
+  }
+  P.done();
+  map.setView(zc, 16, {animate:false});
+  setPlayArea(zc);
+  $('hCity').textContent=`台北市${dist.name}`;
+  placeShooter(zc, pool); initWind(DIFF[j.stars].windMax);
+  setupRound();
+  // 接下的委託從清單移除，補一件新的
+  jobs = jobs.filter(x=>x!==j); jobs.push(makeJob());
+  state='play'; zoomStyle();
+  $('overlay').classList.add('hidden');
+  loading = false; $('loadMsg').textContent='';
+  updHud();
+  if(warn) log(warn, '#ffcc66');
+  else if(U('recon')<1) log(`狙擊場：${dist.name}（${zc[0].toFixed(4)}, ${zc[1].toFixed(4)}）。噁男在黃圈內，藍圈是你的位置。`);
+}
+const THANKS = ['謝謝你……我終於可以安心走回家了。','我不知道該說什麼，只能說謝謝。','今天是這幾個月來，第一次不用回頭看。',
+  '錢不多，但這是我打工存下來的，謝謝你。','我妹妹終於敢再去上學了。','希望再也不會有人遇到他。'];
+function endGame(win, reason){
+  state='over'; updHud(); updRange();
+  if(reconLayer){ map.removeLayer(reconLayer); reconLayer=null; }
+  if(target.alive){   // 失敗時標出噁男位置
+    target.root.querySelector('.ped').style.boxShadow = '0 0 0 3px #ff0,0 0 12px #ff0';
+    target.fig.style.filter = 'drop-shadow(0 0 3px #ff0) drop-shadow(0 0 6px #ff0)';
+    map.setView(target.ll, Math.min(19, map.getMaxZoom()));
+  }
+  const t=Math.max(0,Math.ceil(timeLeft));
+  let rows='', repD=0, gain=0;
+  if(win){
+    // 條件全部依序達成 = 全額；否則依完成比例拿 30%~80%
+    const steps = job.req.steps, full = seqOk && seqDone===steps.length;
+    const ratio = full ? 1 : 0.3 + 0.5*Math.min(seqDone, steps.length-1)/Math.max(1, steps.length-1);
+    const base = Math.round(job.pay*ratio/100)*100;
+    const bonus = full ? Math.round(t*5/100)*100 : 0;   // 剩餘每秒 NT$5，只有完全達成才有
+    const cut = Math.round(base*Math.min(1, civKills*CIV_PAY_CUT));
+    gain = Math.max(0, base + bonus - cut);
+    repD = (full ? 5*job.stars : 1) - civKills*CIV_REP;
+    save.done++;
+    rows = `<tr><td>委託條件</td><td class="${full?'pos':'neg'}">${full?'✔ 完全達成':`✘ 未達成（完成 ${seqDone}/${steps.length}）`}</td></tr>
+            <tr><td>委託酬勞${full?'':`（${Math.round(ratio*100)}%）`}</td><td class="pos">+${money(base)}</td></tr>
+            ${full?`<tr><td>時間獎金（剩 ${t} 秒）</td><td class="pos">+${money(bonus)}</td></tr>`:''}
+            ${civKills?`<tr><td>誤傷 ${civKills} 人</td><td class="neg">-${money(cut)}</td></tr>`:''}`;
+  }else{
+    repD = -3 - civKills*CIV_REP;
+    rows = `<tr><td>${reason}</td><td class="neg">沒有酬勞</td></tr>`;
+  }
+  save.money += gain; save.rep = Math.max(0, save.rep + repD); persist();
+  $('endTitle').textContent = win ? '✔ 委託完成' : '✘ 委託失敗';
+  $('endTitle').style.color = win ? 'var(--accent)' : 'var(--warn)';
+  $('endTxt').innerHTML = `<table class="result">${rows}
+      <tr><td>實得</td><td><b style="color:#ffd54a">${money(gain)}</b></td></tr>
+      <tr><td>消耗子彈</td><td>${shotsFired} 發（庫存剩 ${save.ammo}）</td></tr>
+      <tr><td>聲望</td><td class="${repD>=0?'pos':'neg'}">${repD>=0?'+':''}${repD}（目前 ${save.rep}）</td></tr>
+      <tr><td>資金</td><td>${money(save.money)}</td></tr></table>
+    <p style="margin-top:10px;opacity:.85">${win ? `委託人 ${job.client} 留言：「${pick(THANKS)}」` : '噁男已用黃框標示。'}</p>`;
+  setTimeout(()=>{ $('startBox').classList.add('hidden'); $('endBox').classList.remove('hidden'); $('overlay').classList.remove('hidden'); }, win?900:1600);
+}
+
+$('againBtn').onclick=()=>{
+  $('endBox').classList.add('hidden'); $('startBox').classList.remove('hidden');
+  state='idle'; updRange(); renderTerminal(); showTab('jobs');
+};
+$('fire').onclick=fire;
+$('extract').onclick=extract;
+addEventListener('keydown', e=>{
+  if(e.code==='Space'||e.code==='KeyF'){ e.preventDefault(); fire(); }
+  else if(e.key==='+'||e.key==='='||e.key==='e') map.zoomIn();
+  else if(e.key==='-'||e.key==='q') map.zoomOut();
+});
+
+map.setView(DISTRICTS.xinyi.c, 15);
+zoomStyle();
+refreshJobs(); renderTerminal();
+// 除錯介面：網址加上 ?debug 才開放（例如 index.html?debug）
+if(/[?&]debug\b/.test(location.search)){
+  window.skyMap = map;
+  window.nmkDebug = { get target(){ return target; }, get save(){ return save; }, ballistics:a=>ballistics(a), fire,
+    partAtLocal, CLIENTS, INCIDENTS, makeJob };
+}
+})();
+</script>
+</body>
+</html>

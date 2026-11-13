@@ -1,0 +1,9 @@
+_backup*/
+_staging/
+_設計參考/
+_samples/
+_想法/
+node_modules/
+.claude/settings.local.json
+Thumbs.db
+.DS_Store
