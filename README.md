@@ -1,6 +1,6 @@
 # 噁男殺手　SKY KILLER
 
-在真實台北市衛星地圖上狙擊噁男的俯視狙擊遊戲。你是暗網上的頂尖駭客兼職業狙擊手，對一般仇殺沒興趣，只接被性騷擾、跟騷、偷拍的女性與女學生的委託。法律管不了的噁男，由你從幾百公尺外解決。
+在真實台北市空照地圖上狙擊噁男的俯視狙擊遊戲。你是暗網上的頂尖駭客兼職業狙擊手，對一般仇殺沒興趣，只接被性騷擾、跟騷、偷拍的女性與女學生的委託。法律管不了的噁男，由你從幾百公尺外解決。
 
 🎮 **線上試玩：** https://xiang0723.github.io/project_game_skykiller/
 
@@ -12,7 +12,7 @@
 
 ## 遊戲特色
 
-- **真實的台北市地圖**：Esri 衛星空照圖加上 OpenStreetMap 的真實路網，涵蓋台北市 12 個行政區。選好行政區後，每一局都會在區內隨機挑一塊市區當狙擊場，每次的街景都不一樣。
+- **真實的台北市地圖**：內政部國土測繪中心的正射空照圖加上 OpenStreetMap 的真實路網，涵蓋台北市 12 個行政區。選好行政區後，每一局都會在區內隨機挑一塊市區當狙擊場，每次的街景都不一樣。
 - **上帝視角狙擊**：從正上方俯瞰街道，拖曳地圖瞄準，縮放就是狙擊鏡倍率。×18 看得到上衣顏色，×19 看得到帽子，×21 以上看得到身體部位。
 - **真實的彈道**：你從地圖上固定的狙擊位置開槍。距離越遠，子彈飛得越久，移動中的目標要抓提前量。橫風會把子彈吹偏，準星旁的藍點會標出風偏修正後的落點，把噁男對準藍點就打得中；瞄準輔助也會幫你補上大部分提前量，手機也能玩。
 - **暗網委託**：委託人會描述噁男的惡行，情節從輕微騷擾到極度噁心都有，由上百種行為、地點與後續組合出上萬種不重複的描述，並附上噁男的兩項特徵（帽子顏色、上衣顏色）與出沒的行政區。
@@ -37,7 +37,7 @@
 ## 技術
 
 - 純前端：HTML + CSS + 原生 JavaScript，**不需要建置工具**。
-- 地圖：[Leaflet](https://leafletjs.com/) + [Esri World Imagery](https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9) 衛星空照圖。
+- 地圖：[Leaflet](https://leafletjs.com/) + [內政部國土測繪中心](https://maps.nlsc.gov.tw/) 正射影像（WMTS 圖磚服務）。
 - 路網：[OpenStreetMap](https://www.openstreetmap.org/) 資料，事先用 Overpass API 下載各行政區的區界與道路，壓縮後放在 `data/`，遊戲執行時不需要連到 OpenStreetMap。
 - 人物：程式產生的 SVG 俯視人形，外觀與命中判定使用同一份部位資料，看到的就是打得到的。
 - 音效：Web Audio API 即時合成（槍聲、街道回音、拉栓上膛、倒數計時），沒有音效檔。
@@ -93,7 +93,7 @@ images/
 
 本遊戲為虛構作品，委託人、噁男與所有情節皆為隨機產生，與任何真實人物、事件無關。遊戲以誇張的復仇幻想為題材，不代表鼓勵任何現實中的暴力或私刑。如果你正遭受性騷擾或跟蹤騷擾，請撥打 **113 保護專線** 或 **110** 報警。
 
-衛星空照圖 © Esri、Maxar、Earthstar Geographics。路網資料 © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors。
+正射影像 © 內政部國土測繪中心。路網資料 © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors。
 
 ## 授權
 
@@ -106,7 +106,7 @@ Copyright © 2026 Jax Huang（GitHub：[xiang0723](https://github.com/xiang0723)
 
 完整條款見 [LICENSE](LICENSE)。
 
-第三方資源依各自的授權使用：[Leaflet](https://leafletjs.com/)（BSD 2-Clause）、[OpenStreetMap](https://www.openstreetmap.org/copyright) 資料（ODbL）、[Esri World Imagery](https://www.esri.com/en-us/legal/terms/full-master-agreement)（依 Esri 使用條款，僅即時顯示，不重新散布圖資）。
+第三方資源依各自的授權使用：[Leaflet](https://leafletjs.com/)（BSD 2-Clause）、[OpenStreetMap](https://www.openstreetmap.org/copyright) 資料（ODbL）、內政部國土測繪中心正射影像（[政府資料開放授權條款](https://data.gov.tw/license)，僅即時顯示，不重新散布圖資）。
 
 ## 製作
 

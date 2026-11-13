@@ -309,7 +309,7 @@
   </div>
   <div id="ammoBar" class="panel hidden"></div>
 </div>
-<div id="credit">衛星圖 &copy; Esri, Maxar, Earthstar Geographics｜道路 &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 貢獻者｜<a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a></div>
+<div id="credit">正射影像 &copy; <a href="https://maps.nlsc.gov.tw/" target="_blank" rel="noopener">內政部國土測繪中心</a>｜道路 &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> 貢獻者｜<a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a></div>
 <div id="toast"></div>
 <div id="breath"><i></i></div>
 <button id="fire">開火<br><small>SPACE</small></button>
@@ -898,9 +898,10 @@ const map = L.map('map', {
   scrollWheelZoom:'center', doubleClickZoom:'center', touchZoom:'center',
   minZoom:15, maxZoom:24, zoomSnap:1, inertia:true, keyboard:false,
 });
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  maxNativeZoom:19, maxZoom:24,   // ×20 以上是數位放大（衛星圖會變糊，但人物是向量圖，仍然清楚）
-  attribution:'衛星圖 &copy; Esri, Maxar, Earthstar Geographics｜道路 &copy; OpenStreetMap 貢獻者',
+// 底圖：內政部國土測繪中心正射影像（WMTS，政府資料開放授權）。原生解析度到 ×20，比 Esri 清楚、陰影較淺
+L.tileLayer('https://wmts.nlsc.gov.tw/wmts/PHOTO2/default/GoogleMapsCompatible/{z}/{y}/{x}', {
+  maxNativeZoom:20, maxZoom:24,   // ×21 以上是數位放大（空照會變糊，但人物是向量圖，仍然清楚）
+  attribution:'正射影像 &copy; 內政部國土測繪中心｜道路 &copy; OpenStreetMap 貢獻者',
 }).addTo(map);
 
 function zoomStyle(){
