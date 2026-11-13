@@ -481,11 +481,11 @@
       </ul>
       <h3>聲望</h3>
       <ul>
-        <li>完美達成委託 +5～15，失敗 -3，每誤傷一個路人 -10。聲望可以是負的</li>
+        <li>完美達成委託 +2～6（★ × 2），部分完成 +1，失敗 -3，每誤傷一個路人 -10。聲望可以是負的</li>
         <li><b>小費</b>：完成委託時額外拿到 聲望 × 10（聲望是負的就沒有小費）</li>
         <li><b>解密情報</b>：委託的出沒地點、噁男特徵和現場狀況（時限、人潮、風速）是加密的，付 $5 解密後才看得到、才能接案</li>
         <li><b>學生委託</b>：國小、國高中、大學生、研究生沒什麼錢，酬勞很少，也沒有小費和時間獎金；有些甚至是<b>免費委託</b>，但完成後聲望加 3 倍</li>
-        <li><b>售價</b>：彈藥與裝備升級都減去 聲望 × 10；聲望是負的就會變貴。最低是原價的 10%</li>
+        <li><b>售價</b>：聲望越高折扣越多，但越往上越難再便宜：聲望 50 約 9 折、100 約 85 折、300 約 78 折，最多 7 折。聲望是負的就會變貴（每 1 點貴 1%，最多貴 50%）</li>
         <li>聲望越高，越常收到高難度、高酬勞的 ★★★ 委託</li>
       </ul>
       <h3>委託條件</h3>
@@ -719,8 +719,10 @@ try{
 }catch(e){}
 function persist(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }catch(e){} }
 const U = k => UPGRADES[k].vals[save.up[k]];
-/* 聲望：售價 = 原價 − 聲望 × 10（聲望為負就變貴），最低是原價的 10%；完成任務的小費 = 聲望 × 10（負的就沒有） */
-const priceOf = base => Math.max(Math.ceil(base*0.1), base - save.rep*10);
+/* 聲望：折扣 = 30% × 聲望 ÷ (聲望 + 100)，越高越難再往上加（50 約 9 折、100 約 85 折、300 約 78 折，最多 7 折）；
+   聲望是負的就變貴，每 1 點貴 1%，最多貴 50%。完成任務的小費 = 聲望 × 10（負的就沒有） */
+const repRate = () => save.rep >= 0 ? -0.3*save.rep/(save.rep+100) : Math.min(0.5, -save.rep*0.01);
+const priceOf = base => Math.round(base*(1+repRate())/10)*10;
 const tipOf = () => Math.max(0, save.rep*10);
 const ammoTotal = () => AMMO_KEYS.reduce((s,k)=>s+(save.ammo[k]||0), 0);
 const money = n => '$' + Math.round(n).toLocaleString('en-US');
@@ -2077,7 +2079,7 @@ function endGame(win, reason){
     const cut = Math.round(base*Math.min(1, civKills*CIV_PAY_CUT));
     const tip = job.stu ? 0 : tipOf();   // 小費：依完成任務當下的聲望（學生付不起小費）
     gain = Math.max(0, base + bonus - cut) + tip;
-    repD = (full ? 5*job.stars : covered>0 ? 2 : 0) * (job.free ? FREE_REP_X : 1) - civKills*CIV_REP;   // 免費委託聲望 ×3
+    repD = (full ? 2*job.stars : covered>0 ? 1 : 0) * (job.free ? FREE_REP_X : 1) - civKills*CIV_REP;   // 免費委託聲望 ×3
     save.done++;
     const verdict = full ? '✔ 完美達成' : covered>=steps.length ? `△ 部位全中但順序不對` : covered>0 ? `△ 部分完成（${covered}/${steps.length}）` : '✘ 沒打中指定部位（只解決了噁男）';
     rows = `<tr><td>委託條件</td><td class="${full?'pos':'neg'}">${verdict}</td></tr>
